@@ -6,24 +6,40 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "test:performance": "playwright test tests/performance",
+    "test:generate-images": "ts-node tests/helpers/imageGenerator.ts",
+    "test:lighthouse": "lhci autorun"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.10",
+    "@tanstack/react-query-devtools": "^5.90.2",
+    "@types/react-window": "^1.8.8",
     "axios": "^1.13.2",
+    "canvas-confetti": "^1.9.4",
     "next": "16.0.3",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-hot-toast": "^2.6.0",
+    "react-window": "^2.2.3",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.56.1",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/node": "^20.19.25",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
     "typescript": "^5"
   }
 }

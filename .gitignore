@@ -23,3 +23,11 @@ node_modules/
 
 # OS specific
 .DS_Store
+
+# Backend
+backend/target/
+backend/*.log
+backend/logs/
+backend/backend.pid
+
+demo/

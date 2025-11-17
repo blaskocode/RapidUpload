@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: backend
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    date-format: yyyy-MM-dd'T'HH:mm:ss.SSS'Z'
+    time-zone: UTC
+
+aws:
+  region: us-east-1
+  s3:
+    bucket-name: rapidupload-photos
+  dynamodb:
+    tables:
+      properties: Properties
+      photos: Photos
+
+server:
+  port: 8080
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 10
+    max-connections: 10000
+    accept-count: 100
+    connection-timeout: 60s
+
