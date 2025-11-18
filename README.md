@@ -136,3 +136,4 @@ RapidUpload/
 The backend will automatically create DynamoDB tables (`Properties` and `Photos`) on first startup if they don't exist.
 
 
+

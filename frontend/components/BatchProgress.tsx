@@ -89,9 +89,6 @@ export default function BatchProgress({
             {failedCount > 0 && (
               <span className="text-red-600 font-medium">{failedCount} failed</span>
             )}
-            {inProgressCount > 0 && (
-              <span className="text-blue-600 font-medium">{inProgressCount} uploading</span>
-            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
