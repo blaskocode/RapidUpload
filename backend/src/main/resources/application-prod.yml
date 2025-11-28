@@ -1,0 +1,55 @@
+# CORS configuration - comma-separated list of allowed origins
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:https://rapidupload.vercel.app,https://rapidupload-demo.vercel.app}
+
+spring:
+  application:
+    name: backend
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    date-format: yyyy-MM-dd'T'HH:mm:ss.SSS'Z'
+    time-zone: UTC
+
+aws:
+  region: ${AWS_REGION:us-east-1}
+  s3:
+    bucket-name: ${S3_BUCKET_NAME:rapidupload-photos}
+  dynamodb:
+    tables:
+      properties: ${DYNAMODB_PROPERTIES_TABLE:Properties}
+      photos: ${DYNAMODB_PHOTOS_TABLE:Photos}
+      analysis: ${DYNAMODB_ANALYSIS_TABLE:Analysis}
+  analysis:
+    lambda-function-name: ${ANALYSIS_LAMBDA_NAME:rapidupload-photo-analysis}
+    report-lambda-name: ${REPORT_LAMBDA_NAME:rapidupload-report-generator}
+    min-confidence: 60.0
+
+server:
+  port: ${PORT:5000}
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 20
+    max-connections: 10000
+    accept-count: 100
+    connection-timeout: 60s
+
+# Production logging
+logging:
+  level:
+    root: WARN
+    com.rapidupload: INFO
+    org.springframework.web: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Actuator for health checks
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized

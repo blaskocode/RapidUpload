@@ -1,0 +1,15 @@
+{
+  "CORSRules": [
+    {
+      "AllowedHeaders": ["*"],
+      "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
+      "AllowedOrigins": [
+        "https://rapidupload.vercel.app",
+        "https://rapidupload-demo.vercel.app",
+        "https://*.vercel.app"
+      ],
+      "ExposeHeaders": ["ETag", "x-amz-meta-custom-header"],
+      "MaxAgeSeconds": 3600
+    }
+  ]
+}
