@@ -486,17 +486,18 @@ export class UploadManager {
         return result.status === 'fulfilled' && status === 'complete';
       });
 
-      // Retry confirmations for photos that uploaded to S3 but confirmation failed
-      const uploadedButNotConfirmed = queuedPhotos.filter((photo, index) => {
+      // Retry confirmations for photos that are still uploading after S3 upload completed
+      // (This handles the case where S3 succeeded but confirmation failed)
+      const stillUploading = queuedPhotos.filter((photo, index) => {
         const result = uploadResults[index];
         const status = currentStore.uploadStatus[photo.photoId]?.status;
-        return result.status === 'fulfilled' && status === 'uploaded'; // S3 succeeded but confirmation failed
+        return result.status === 'fulfilled' && status === 'uploading';
       });
 
-      if (uploadedButNotConfirmed.length > 0) {
-        console.log(`Retrying confirmation for ${uploadedButNotConfirmed.length} photos`);
+      if (stillUploading.length > 0) {
+        console.log(`Retrying confirmation for ${stillUploading.length} photos`);
         // Retry confirmations in parallel
-        const retryPromises = uploadedButNotConfirmed.map(async (photo) => {
+        const retryPromises = stillUploading.map(async (photo) => {
           try {
             await api.post('/photos/confirm-status', {
               photoId: photo.photoId,
@@ -507,9 +508,11 @@ export class UploadManager {
               status: 'complete',
               progress: 100,
             });
-          } catch (error: any) {
+          } catch (error: unknown) {
             console.error(`Retry confirmation failed for ${photo.photoId}:`, error);
-            // Keep as 'uploaded' - can be manually retried later
+            useUploadStore.getState().updateUploadStatus(photo.photoId, {
+              status: 'failed',
+            });
           }
         });
         await Promise.allSettled(retryPromises);

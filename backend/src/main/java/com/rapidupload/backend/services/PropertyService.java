@@ -10,7 +10,10 @@ import com.rapidupload.backend.models.Photo;
 import com.rapidupload.backend.models.Property;
 import com.rapidupload.backend.repositories.PhotoRepository;
 import com.rapidupload.backend.repositories.PropertyRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 
 import java.util.List;
 import java.util.Map;
@@ -19,12 +22,16 @@ import java.util.stream.Collectors;
 @Service
 public class PropertyService {
 
+    private static final Logger logger = LoggerFactory.getLogger(PropertyService.class);
+
     private final PropertyRepository propertyRepository;
     private final PhotoRepository photoRepository;
+    private final S3Service s3Service;
 
-    public PropertyService(PropertyRepository propertyRepository, PhotoRepository photoRepository) {
+    public PropertyService(PropertyRepository propertyRepository, PhotoRepository photoRepository, S3Service s3Service) {
         this.propertyRepository = propertyRepository;
         this.photoRepository = photoRepository;
+        this.s3Service = s3Service;
     }
 
     public PropertyResponse createProperty(CreatePropertyRequest request) {
@@ -65,18 +72,79 @@ public class PropertyService {
     public PagedPhotoResponse getPropertyPhotos(String propertyId, Integer limit, Map<String, String> exclusiveStartKey) {
         // Verify property exists
         propertyRepository.getProperty(propertyId);
-        
+
         PagedResponse<Photo> pagedPhotos = photoRepository.listPhotosByProperty(propertyId, limit, exclusiveStartKey);
-        
+
+        // Backfill missing metadata from S3 for photos that don't have it
+        for (Photo photo : pagedPhotos.getItems()) {
+            if (needsMetadataBackfill(photo)) {
+                backfillPhotoMetadata(photo);
+            }
+        }
+
         List<PhotoResponse> photoResponses = pagedPhotos.getItems().stream()
                 .map(this::toPhotoResponse)
                 .collect(Collectors.toList());
-        
+
         return new PagedPhotoResponse(
                 photoResponses,
                 pagedPhotos.getLastEvaluatedKey(),
                 pagedPhotos.isHasMore()
         );
+    }
+
+    /**
+     * Check if a photo needs metadata backfill (missing fileSize, status, or contentType)
+     */
+    private boolean needsMetadataBackfill(Photo photo) {
+        return photo.getFileSize() == null || photo.getStatus() == null || photo.getContentType() == null;
+    }
+
+    /**
+     * Backfill missing photo metadata from S3 and update the database
+     */
+    private void backfillPhotoMetadata(Photo photo) {
+        if (photo.getS3Key() == null) {
+            logger.warn("Cannot backfill metadata for photo {} - no S3 key", photo.getPhotoId());
+            return;
+        }
+
+        try {
+            HeadObjectResponse s3Metadata = s3Service.getObjectMetadata(photo.getS3Key());
+            if (s3Metadata == null) {
+                logger.warn("Could not get S3 metadata for photo {}", photo.getPhotoId());
+                return;
+            }
+
+            boolean updated = false;
+
+            // Backfill file size
+            if (photo.getFileSize() == null && s3Metadata.contentLength() != null) {
+                photo.setFileSize(s3Metadata.contentLength());
+                updated = true;
+            }
+
+            // Backfill content type
+            if (photo.getContentType() == null && s3Metadata.contentType() != null) {
+                photo.setContentType(s3Metadata.contentType());
+                updated = true;
+            }
+
+            // Backfill status - if file exists in S3, it's uploaded
+            if (photo.getStatus() == null) {
+                photo.setStatus("uploaded");
+                updated = true;
+            }
+
+            // Persist changes to database
+            if (updated) {
+                photoRepository.updatePhoto(photo);
+                logger.info("Backfilled metadata for photo {}: fileSize={}, contentType={}, status={}",
+                        photo.getPhotoId(), photo.getFileSize(), photo.getContentType(), photo.getStatus());
+            }
+        } catch (Exception e) {
+            logger.error("Error backfilling metadata for photo {}: {}", photo.getPhotoId(), e.getMessage());
+        }
     }
 
     /**

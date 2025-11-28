@@ -3,6 +3,10 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import type { Photo } from '@/types/api';
+import { useAnalysisByPhoto } from '@/lib/hooks/useAnalysis';
+import BoundingBoxOverlay from './BoundingBoxOverlay';
+import AnalysisResultsPanel from './AnalysisResultsPanel';
+import AnalysisStatusBadge from './AnalysisStatusBadge';
 
 interface PhotoLightboxProps {
   photos: Photo[];
@@ -30,6 +34,9 @@ export default function PhotoLightbox({
   useEffect(() => {
     setIsImageLoading(true);
   }, [currentIndex]);
+
+  // Get analysis for current photo
+  const { data: analysis } = useAnalysisByPhoto(photos[currentIndex]?.photoId);
 
   // Keyboard event handlers
   useEffect(() => {
@@ -77,10 +84,11 @@ export default function PhotoLightbox({
   if (!isOpen || photos.length === 0) return null;
 
   const currentPhoto = photos[currentIndex];
-  const photoUrl =
-    currentPhoto.status === 'uploaded'
-      ? `https://${currentPhoto.s3Bucket}.s3.us-east-1.amazonaws.com/${currentPhoto.s3Key}`
-      : null;
+  // Note: We treat null/undefined status as 'uploaded' for backwards compatibility
+  const isUploaded = currentPhoto.status === 'uploaded' || currentPhoto.status === null || currentPhoto.status === undefined;
+  const photoUrl = isUploaded
+    ? `https://${currentPhoto.s3Bucket}.s3.us-east-1.amazonaws.com/${currentPhoto.s3Key}`
+    : null;
 
   if (!photoUrl) return null;
 
@@ -176,18 +184,28 @@ export default function PhotoLightbox({
           </div>
         )}
         <div className="relative max-w-full max-h-full">
-          <Image
-            src={photoUrl}
-            alt={currentPhoto.filename}
-            width={1920}
-            height={1080}
-            className={`max-w-full max-h-[90vh] object-contain transition-opacity duration-300 ${
-              isImageLoading ? 'opacity-0' : 'opacity-100'
-            }`}
-            priority
-            onLoad={() => setIsImageLoading(false)}
-            onError={() => setIsImageLoading(false)}
-          />
+          <div className="relative">
+            <Image
+              src={photoUrl}
+              alt={currentPhoto.filename}
+              width={1920}
+              height={1080}
+              className={`max-w-full max-h-[90vh] object-contain transition-opacity duration-300 ${
+                isImageLoading ? 'opacity-0' : 'opacity-100'
+              }`}
+              priority
+              onLoad={() => setIsImageLoading(false)}
+              onError={() => setIsImageLoading(false)}
+            />
+            {/* Bounding box overlay for analysis */}
+            {analysis?.status === 'completed' && analysis.detections && (
+              <BoundingBoxOverlay
+                detections={analysis.detections}
+                imageWidth={1920}
+                imageHeight={1080}
+              />
+            )}
+          </div>
         </div>
       </div>
 
@@ -206,7 +224,17 @@ export default function PhotoLightbox({
             day: 'numeric',
           })}
         </div>
+        <div className="mt-2">
+          <AnalysisStatusBadge analysis={analysis} />
+        </div>
       </div>
+
+      {/* Analysis results panel */}
+      {analysis && analysis.status === 'completed' && (
+        <div className="absolute top-4 left-4 max-w-sm max-h-[60vh] overflow-y-auto">
+          <AnalysisResultsPanel analysis={analysis} />
+        </div>
+      )}
     </div>
   );
 }

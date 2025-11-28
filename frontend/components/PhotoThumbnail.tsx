@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import type { Photo } from '@/types/api';
+import { useAnalysisByPhoto } from '@/lib/hooks/useAnalysis';
+import AnalysisStatusBadge from './AnalysisStatusBadge';
 
 interface PhotoThumbnailProps {
   photo: Photo;
@@ -15,11 +17,15 @@ export default function PhotoThumbnail({ photo, index, onClick }: PhotoThumbnail
   const [hasError, setHasError] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
 
+  // Get analysis status for this photo
+  const { data: analysis } = useAnalysisByPhoto(photo.photoId);
+
   // Construct S3 URL
-  const photoUrl =
-    photo.status === 'uploaded'
-      ? `https://${photo.s3Bucket}.s3.us-east-1.amazonaws.com/${photo.s3Key}`
-      : null;
+  // Note: We treat null/undefined status as 'uploaded' for backwards compatibility
+  const isUploaded = photo.status === 'uploaded' || photo.status === null || photo.status === undefined;
+  const photoUrl = isUploaded
+    ? `https://${photo.s3Bucket}.s3.us-east-1.amazonaws.com/${photo.s3Key}`
+    : null;
 
   // Format file size
   const formatFileSize = (bytes: number): string => {
@@ -108,6 +114,13 @@ export default function PhotoThumbnail({ photo, index, onClick }: PhotoThumbnail
         </div>
       )}
 
+      {/* Analysis status badge */}
+      {!isLoading && !hasError && analysis && (
+        <div className="absolute top-2 right-2 z-10">
+          <AnalysisStatusBadge analysis={analysis} compact />
+        </div>
+      )}
+
       {/* Metadata overlay on hover */}
       {showMetadata && !isLoading && !hasError && (
         <div className="absolute inset-0 bg-black bg-opacity-60 flex items-end p-3 transition-opacity duration-200">
@@ -118,9 +131,11 @@ export default function PhotoThumbnail({ photo, index, onClick }: PhotoThumbnail
             <div className="text-gray-300 text-xs">
               {formatDate(photo.uploadedAt)}
             </div>
-            <div className="text-gray-300 text-xs">
-              {formatFileSize(photo.fileSize)}
-            </div>
+            {photo.fileSize != null && (
+              <div className="text-gray-300 text-xs">
+                {formatFileSize(photo.fileSize)}
+              </div>
+            )}
           </div>
         </div>
       )}

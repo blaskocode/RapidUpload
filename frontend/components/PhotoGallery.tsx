@@ -21,9 +21,13 @@ export default function PhotoGallery({ propertyId, onPhotoClick }: PhotoGalleryP
   } = usePropertyPhotosInfinite(propertyId, 50);
 
   // Flatten all pages into a single array and filter to only show uploaded photos
+  // Note: We treat null/undefined status as 'uploaded' for backwards compatibility
+  // with photos added before status tracking was implemented
   const photos = useMemo(() => {
     const allPhotos = data?.pages.flatMap((page) => page.items) ?? [];
-    const uploadedPhotos = allPhotos.filter(photo => photo.status === 'uploaded');
+    const uploadedPhotos = allPhotos.filter(photo =>
+      photo.status === 'uploaded' || photo.status === null || photo.status === undefined
+    );
     
     // Debug logging to help diagnose issues
     if (allPhotos.length > 0 && uploadedPhotos.length !== allPhotos.length) {

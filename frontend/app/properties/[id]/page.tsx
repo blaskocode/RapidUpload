@@ -2,9 +2,12 @@
 
 import { use, useState, useMemo } from 'react';
 import { useProperty, usePropertyPhotosInfinite } from '@/lib/hooks/useProperties';
+import { useAnalysisByProperty } from '@/lib/hooks/useAnalysis';
 import { useRouter } from 'next/navigation';
 import PhotoGallery from '@/components/PhotoGallery';
 import PhotoLightbox from '@/components/PhotoLightbox';
+import AnalyzeAllButton from '@/components/AnalyzeAllButton';
+import GenerateReportButton from '@/components/GenerateReportButton';
 import type { Photo } from '@/types/api';
 
 interface PageProps {
@@ -16,14 +19,27 @@ export default function PropertyDetailPage({ params }: PageProps) {
   const { id } = use(params);
   const { data: property, isLoading: propertyLoading, error: propertyError } = useProperty(id);
   const { data: photosData } = usePropertyPhotosInfinite(id, 50);
+  const { data: analysisData } = useAnalysisByProperty(id);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
   // Flatten all pages into a single array for lightbox (only uploaded photos)
+  // Note: We treat null/undefined status as 'uploaded' for backwards compatibility
   const allPhotos = useMemo(() => {
     const all = photosData?.pages.flatMap((page) => page.items) ?? [];
-    return all.filter(photo => photo.status === 'uploaded');
+    return all.filter(photo =>
+      photo.status === 'uploaded' || photo.status === null || photo.status === undefined
+    );
   }, [photosData]);
+
+  // Get photo IDs with completed analysis for report generation
+  const analyzedPhotoIds = useMemo(() => {
+    if (!analysisData?.pages) return [];
+    const allAnalysis = analysisData.pages.flatMap((page) => page.items);
+    return allAnalysis
+      .filter((a) => a.status === 'completed')
+      .map((a) => a.photoId);
+  }, [analysisData]);
 
   if (propertyLoading) {
     return (
@@ -98,6 +114,25 @@ export default function PropertyDetailPage({ params }: PageProps) {
               </svg>
               Upload Photos
             </button>
+          </div>
+
+          {/* Analysis Actions */}
+          <div className="flex gap-4 mt-4 pt-4 border-t border-gray-200">
+            <AnalyzeAllButton
+              propertyId={id}
+              photoIds={allPhotos.map(p => p.photoId)}
+              disabled={allPhotos.length === 0}
+            />
+            <GenerateReportButton
+              propertyId={id}
+              photoIds={analyzedPhotoIds}
+              disabled={analyzedPhotoIds.length === 0}
+            />
+            {analyzedPhotoIds.length > 0 && (
+              <span className="self-center text-sm text-gray-500">
+                {analyzedPhotoIds.length} photo{analyzedPhotoIds.length !== 1 ? 's' : ''} analyzed
+              </span>
+            )}
           </div>
         </div>
 

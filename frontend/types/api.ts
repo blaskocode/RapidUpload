@@ -35,3 +35,49 @@ export interface ApiError {
   fieldErrors?: Record<string, string>;
 }
 
+// Analysis types
+export interface BoundingBox {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+export interface Detection {
+  label: string;
+  category: 'damage' | 'material' | 'other';
+  confidence: number;
+  boundingBox?: BoundingBox;
+  count?: number;
+}
+
+export interface AnalysisResult {
+  analysisId: string;
+  photoId: string;
+  propertyId: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  createdAt: string;
+  completedAt?: string;
+  detections: Detection[];
+  claudeAnalysis?: string;
+  errorMessage?: string;
+  lowConfidence: boolean;
+}
+
+export interface PagedAnalysisResponse {
+  items: AnalysisResult[];
+  lastEvaluatedKey?: Record<string, string> | null;
+  hasMore: boolean;
+}
+
+export interface TriggerAnalysisRequest {
+  propertyId: string;
+  photoIds: string[];
+}
+
+export interface ReportResponse {
+  reportKey: string;
+  downloadUrl: string;
+  photosIncluded: number;
+}
+
