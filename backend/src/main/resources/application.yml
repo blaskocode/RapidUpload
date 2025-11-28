@@ -15,6 +15,11 @@ aws:
     tables:
       properties: Properties
       photos: Photos
+      analysis: Analysis
+  analysis:
+    lambda-function-name: rapidupload-photo-analysis
+    report-lambda-name: rapidupload-report-generator
+    min-confidence: 60.0
 
 server:
   port: 8080

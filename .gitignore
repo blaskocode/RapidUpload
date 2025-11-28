@@ -11,6 +11,7 @@ node_modules/
 
 # Environment variables
 .env
+.env.*
 
 # Editor directories and files
 .idea
@@ -30,4 +31,26 @@ backend/*.log
 backend/logs/
 backend/backend.pid
 
+# Lambda / AWS SAM
+.aws-sam/
+lambda/**/.aws-sam/
+*.zip
+samconfig.toml
+
+# Test images (not needed in repo)
+*.jpg
+*.jpeg
+*.png
+!frontend/public/**/*.png
+!frontend/public/**/*.jpg
+
+# API response files
+response.json
+
+# Demo directory
 demo/
+
+# Thoughts directory (local planning/notes)
+thoughts/
+
+.claude/

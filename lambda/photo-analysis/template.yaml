@@ -1,0 +1,96 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: RapidUpload Photo Analysis Lambda
+
+Parameters:
+  AnalysisTableName:
+    Type: String
+    Default: Analysis
+  PhotosBucketName:
+    Type: String
+    Default: rapidupload-photos
+  MinConfidence:
+    Type: Number
+    Default: 60
+  OpenAIApiKey:
+    Type: String
+    Description: OpenAI API Key (store in AWS Secrets Manager for production)
+    NoEcho: true
+  OpenAIModel:
+    Type: String
+    Default: gpt-4o
+
+Resources:
+  PhotoAnalysisFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: rapidupload-photo-analysis
+      Handler: handler.handler
+      Runtime: python3.11
+      Timeout: 300
+      MemorySize: 1024
+      Environment:
+        Variables:
+          ANALYSIS_TABLE: !Ref AnalysisTableName
+          MIN_CONFIDENCE: !Ref MinConfidence
+          OPENAI_API_KEY: !Ref OpenAIApiKey
+          OPENAI_MODEL: !Ref OpenAIModel
+          PHOTOS_TABLE: Photos
+          PHOTOS_BUCKET: !Ref PhotosBucketName
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource: !Sub 'arn:aws:s3:::${PhotosBucketName}/*'
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+                - dynamodb:PutItem
+              Resource: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AnalysisTableName}'
+
+  ReportGeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: rapidupload-report-generator
+      Handler: handler.report_handler
+      Runtime: python3.11
+      Timeout: 300
+      MemorySize: 2048
+      Environment:
+        Variables:
+          ANALYSIS_TABLE: !Ref AnalysisTableName
+          PHOTOS_TABLE: Photos
+          PHOTOS_BUCKET: !Ref PhotosBucketName
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource: !Sub 'arn:aws:s3:::${PhotosBucketName}/*'
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+              Resource:
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AnalysisTableName}'
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AnalysisTableName}/index/*'
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Photos'
+
+Outputs:
+  FunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt PhotoAnalysisFunction.Arn
+  FunctionName:
+    Description: Lambda function name
+    Value: !Ref PhotoAnalysisFunction
+  ReportFunctionArn:
+    Description: Report generator Lambda function ARN
+    Value: !GetAtt ReportGeneratorFunction.Arn
+  ReportFunctionName:
+    Description: Report generator Lambda function name
+    Value: !Ref ReportGeneratorFunction

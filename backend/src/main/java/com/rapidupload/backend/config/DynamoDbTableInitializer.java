@@ -23,6 +23,9 @@ public class DynamoDbTableInitializer implements CommandLineRunner {
     @Value("${aws.dynamodb.tables.photos}")
     private String photosTableName;
 
+    @Value("${aws.dynamodb.tables.analysis:Analysis}")
+    private String analysisTableName;
+
     public DynamoDbTableInitializer(DynamoDbClient dynamoDbClient) {
         this.dynamoDbClient = dynamoDbClient;
     }
@@ -32,6 +35,7 @@ public class DynamoDbTableInitializer implements CommandLineRunner {
         try {
             createPropertiesTable();
             createPhotosTable();
+            createAnalysisTable();
             logger.info("DynamoDB tables initialized successfully");
         } catch (Exception e) {
             logger.error("Error initializing DynamoDB tables", e);
@@ -132,6 +136,75 @@ public class DynamoDbTableInitializer implements CommandLineRunner {
             logger.info("Photos table already exists: {}", photosTableName);
         } catch (Exception e) {
             logger.error("Error creating Photos table", e);
+        }
+    }
+
+    private void createAnalysisTable() {
+        try {
+            try {
+                dynamoDbClient.describeTable(DescribeTableRequest.builder()
+                        .tableName(analysisTableName).build());
+                logger.info("Analysis table already exists: {}", analysisTableName);
+                return;
+            } catch (ResourceNotFoundException e) {
+                // Table doesn't exist, create it
+            }
+
+            logger.info("Creating Analysis table: {}", analysisTableName);
+
+            CreateTableRequest createTableRequest = CreateTableRequest.builder()
+                    .tableName(analysisTableName)
+                    .billingMode(BillingMode.PAY_PER_REQUEST)
+                    .attributeDefinitions(
+                            AttributeDefinition.builder()
+                                    .attributeName("AnalysisID")
+                                    .attributeType(ScalarAttributeType.S)
+                                    .build(),
+                            AttributeDefinition.builder()
+                                    .attributeName("PhotoID")
+                                    .attributeType(ScalarAttributeType.S)
+                                    .build(),
+                            AttributeDefinition.builder()
+                                    .attributeName("PropertyID")
+                                    .attributeType(ScalarAttributeType.S)
+                                    .build()
+                    )
+                    .keySchema(
+                            KeySchemaElement.builder()
+                                    .attributeName("AnalysisID")
+                                    .keyType(KeyType.HASH)
+                                    .build()
+                    )
+                    .globalSecondaryIndexes(
+                            GlobalSecondaryIndex.builder()
+                                    .indexName("PhotoID-index")
+                                    .keySchema(KeySchemaElement.builder()
+                                            .attributeName("PhotoID")
+                                            .keyType(KeyType.HASH)
+                                            .build())
+                                    .projection(Projection.builder()
+                                            .projectionType(ProjectionType.ALL)
+                                            .build())
+                                    .build(),
+                            GlobalSecondaryIndex.builder()
+                                    .indexName("PropertyID-index")
+                                    .keySchema(KeySchemaElement.builder()
+                                            .attributeName("PropertyID")
+                                            .keyType(KeyType.HASH)
+                                            .build())
+                                    .projection(Projection.builder()
+                                            .projectionType(ProjectionType.ALL)
+                                            .build())
+                                    .build()
+                    )
+                    .build();
+
+            dynamoDbClient.createTable(createTableRequest);
+            logger.info("Created Analysis table: {}", analysisTableName);
+        } catch (ResourceInUseException e) {
+            logger.info("Analysis table already exists: {}", analysisTableName);
+        } catch (Exception e) {
+            logger.error("Error creating Analysis table", e);
         }
     }
 }
