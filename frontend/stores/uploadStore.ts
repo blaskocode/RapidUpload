@@ -7,13 +7,14 @@ interface UploadStore {
   selectedPropertyId: string | null;
   uploadStatus: Record<string, UploadStatusInfo>;
   isUploading: boolean;
-  
+
   // Actions
   addPhotosToQueue: (files: File[], propertyId: string) => void;
   startUpload: () => void;
   cancelUpload: (photoId: string) => void;
   retryUpload: (photoId: string) => void;
   clearCompleted: () => void;
+  clearAll: () => void;
   updateUploadStatus: (photoId: string, status: Partial<UploadStatusInfo>) => void;
   removeFromQueue: (photoId: string) => void;
   setSelectedPropertyId: (propertyId: string | null) => void;
@@ -141,6 +142,14 @@ export const useUploadStore = create<UploadStore>()(
             queue: state.queue.filter((p) => !completedOrFailedIds.includes(p.photoId)),
             uploadStatus: newStatus,
           };
+        });
+      },
+
+      clearAll: () => {
+        set({
+          queue: [],
+          uploadStatus: {},
+          isUploading: false,
         });
       },
 

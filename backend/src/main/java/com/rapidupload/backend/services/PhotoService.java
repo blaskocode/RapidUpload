@@ -4,7 +4,9 @@ import com.rapidupload.backend.dto.ConfirmUploadResponse;
 import com.rapidupload.backend.exceptions.ConditionalCheckFailedException;
 import com.rapidupload.backend.exceptions.PhotoAlreadyConfirmedException;
 import com.rapidupload.backend.exceptions.PhotoNotFoundException;
+import com.rapidupload.backend.models.AnalysisResult;
 import com.rapidupload.backend.models.Photo;
+import com.rapidupload.backend.repositories.AnalysisRepository;
 import com.rapidupload.backend.repositories.PhotoRepository;
 import com.rapidupload.backend.repositories.PropertyRepository;
 import org.slf4j.Logger;
@@ -38,6 +40,8 @@ public class PhotoService {
 
     private final PhotoRepository photoRepository;
     private final PropertyRepository propertyRepository;
+    private final AnalysisRepository analysisRepository;
+    private final S3Service s3Service;
     private final DynamoDbClient dynamoDbClient;
     private final String bucketName;
     private final String region;
@@ -47,6 +51,8 @@ public class PhotoService {
 
     public PhotoService(PhotoRepository photoRepository,
                        PropertyRepository propertyRepository,
+                       AnalysisRepository analysisRepository,
+                       S3Service s3Service,
                        DynamoDbClient dynamoDbClient,
                        @Value("${aws.s3.bucket-name}") String bucketName,
                        @Value("${aws.region}") String region,
@@ -54,6 +60,8 @@ public class PhotoService {
                        @Value("${aws.dynamodb.tables.properties}") String propertiesTableName) {
         this.photoRepository = photoRepository;
         this.propertyRepository = propertyRepository;
+        this.analysisRepository = analysisRepository;
+        this.s3Service = s3Service;
         this.dynamoDbClient = dynamoDbClient;
         this.bucketName = bucketName;
         this.region = region;
@@ -297,6 +305,95 @@ public class PhotoService {
         logger.info("Batch confirmed {}/{} uploads successfully", successCount, photoIds.size());
 
         return results;
+    }
+
+    /**
+     * Delete a single photo and its associated data (S3 object, analysis results)
+     */
+    public void deletePhoto(String photoId) {
+        Photo photo = photoRepository.getPhoto(photoId);
+
+        logger.info("Deleting photo: {}", photoId);
+
+        // Delete S3 object
+        if (photo.getS3Key() != null) {
+            s3Service.deleteObject(photo.getS3Key());
+        }
+
+        // Delete analysis result if exists
+        AnalysisResult analysis = analysisRepository.getAnalysisByPhotoId(photoId);
+        if (analysis != null) {
+            analysisRepository.deleteAnalysis(analysis.getAnalysisId());
+        }
+
+        // Delete photo record
+        photoRepository.deletePhoto(photoId);
+
+        // Decrement property photo count
+        if (photo.getPropertyId() != null) {
+            propertyRepository.updatePhotoCount(photo.getPropertyId(), -1);
+        }
+
+        logger.info("Successfully deleted photo: {}", photoId);
+    }
+
+    /**
+     * Batch delete photos and their associated data (S3 objects, analysis results)
+     * Uses batch operations for performance.
+     */
+    public int batchDeletePhotos(List<String> photoIds) {
+        if (photoIds == null || photoIds.isEmpty()) {
+            return 0;
+        }
+
+        logger.info("Batch deleting {} photos", photoIds.size());
+
+        // Fetch all photos to get S3 keys and property IDs
+        Map<String, Photo> photos = photoRepository.batchGetPhotos(photoIds);
+
+        // Collect S3 keys for batch deletion
+        List<String> s3Keys = photos.values().stream()
+                .map(Photo::getS3Key)
+                .filter(key -> key != null)
+                .collect(Collectors.toList());
+
+        // Batch delete S3 objects
+        if (!s3Keys.isEmpty()) {
+            s3Service.deleteObjects(s3Keys);
+        }
+
+        // Delete analysis results for each photo
+        List<String> analysisIds = new ArrayList<>();
+        for (String photoId : photoIds) {
+            AnalysisResult analysis = analysisRepository.getAnalysisByPhotoId(photoId);
+            if (analysis != null) {
+                analysisIds.add(analysis.getAnalysisId());
+            }
+        }
+        if (!analysisIds.isEmpty()) {
+            analysisRepository.batchDeleteAnalysis(analysisIds);
+        }
+
+        // Batch delete photo records
+        photoRepository.batchDeletePhotos(photoIds);
+
+        // Update property photo counts (grouped by property)
+        Map<String, Integer> propertyDecrements = new HashMap<>();
+        for (Photo photo : photos.values()) {
+            if (photo.getPropertyId() != null) {
+                propertyDecrements.merge(photo.getPropertyId(), 1, Integer::sum);
+            }
+        }
+        for (Map.Entry<String, Integer> entry : propertyDecrements.entrySet()) {
+            try {
+                propertyRepository.updatePhotoCount(entry.getKey(), -entry.getValue());
+            } catch (Exception e) {
+                logger.error("Failed to update photo count for property {}: {}", entry.getKey(), e.getMessage());
+            }
+        }
+
+        logger.info("Successfully batch deleted {} photos", photoIds.size());
+        return photoIds.size();
     }
 }
 

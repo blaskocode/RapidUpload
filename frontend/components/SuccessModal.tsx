@@ -2,7 +2,11 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import confetti from 'canvas-confetti';
+import Button from '@/components/ui/Button';
+import Card from '@/components/ui/Card';
+import { propertyKeys } from '@/lib/hooks/useProperties';
 
 interface SuccessModalProps {
   isOpen: boolean;
@@ -20,6 +24,7 @@ export default function SuccessModal({
   timeElapsed,
 }: SuccessModalProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (isOpen) {
@@ -65,12 +70,12 @@ export default function SuccessModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md mx-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-text-primary)]/50 backdrop-blur-sm">
+      <Card variant="elevated" padding="lg" className="w-full max-w-md mx-4">
         <div className="text-center">
-          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-[var(--color-success-light)] mb-5">
             <svg
-              className="h-8 w-8 text-green-600"
+              className="h-8 w-8 text-[var(--color-success)]"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -83,32 +88,39 @@ export default function SuccessModal({
               />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Upload Complete!</h2>
-          <p className="text-gray-600 mb-6">
-            Successfully uploaded <span className="font-semibold text-green-600">{totalUploaded}</span> photo{totalUploaded !== 1 ? 's' : ''}
+          <h2 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">Upload Complete!</h2>
+          <p className="text-[var(--color-text-secondary)] mb-6">
+            Successfully uploaded <span className="font-semibold text-[var(--color-success)]">{totalUploaded}</span> photo{totalUploaded !== 1 ? 's' : ''}
             {timeElapsed && ` in ${formatTime(timeElapsed)}`}
           </p>
           <div className="flex gap-3 justify-center">
-            <button
-              onClick={onClose}
-              className="px-6 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-            >
+            <Button variant="secondary" onClick={onClose}>
               Close
-            </button>
+            </Button>
             {propertyId && (
-              <button
-                onClick={() => {
+              <Button
+                variant="primary"
+                onClick={async () => {
+                  // Invalidate the photos cache to ensure fresh data is fetched
+                  await queryClient.invalidateQueries({ queryKey: propertyKeys.photos(propertyId) });
+                  // Also invalidate property details (for photo count)
+                  await queryClient.invalidateQueries({ queryKey: propertyKeys.detail(propertyId) });
+                  await queryClient.invalidateQueries({ queryKey: propertyKeys.list() });
                   router.push(`/properties/${propertyId}`);
                   onClose();
                 }}
-                className="px-6 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
+                rightIcon={
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                }
               >
                 View Gallery
-              </button>
+              </Button>
             )}
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

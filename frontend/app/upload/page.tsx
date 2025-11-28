@@ -7,6 +7,7 @@ import { uploadManager } from '@/lib/uploadManager';
 import FileUploadButton from '@/components/FileUploadButton';
 import BatchProgress from '@/components/BatchProgress';
 import UploadQueue from '@/components/UploadQueue';
+import Card from '@/components/ui/Card';
 import toast from 'react-hot-toast';
 import { usePropertyStore } from '@/stores/propertyStore';
 import SuccessModal from '@/components/SuccessModal';
@@ -20,6 +21,7 @@ function UploadPageContent() {
   const [filter, setFilter] = useState<'all' | 'in-progress' | 'failed' | 'completed'>('all');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [uploadStartTime, setUploadStartTime] = useState<number | null>(null);
+  const [completedUploadCount, setCompletedUploadCount] = useState(0);
 
   // Set property from URL parameter on mount (URL param takes precedence over localStorage)
   useEffect(() => {
@@ -34,8 +36,14 @@ function UploadPageContent() {
   const isUploading = useUploadStore((state) => state.isUploading);
   const addPhotosToQueue = useUploadStore((state) => state.addPhotosToQueue);
   const clearCompleted = useUploadStore((state) => state.clearCompleted);
+  const clearAll = useUploadStore((state) => state.clearAll);
   const cancelUpload = useUploadStore((state) => state.cancelUpload);
   const retryUpload = useUploadStore((state) => state.retryUpload);
+
+  // Clear any previous uploads when the page mounts
+  useEffect(() => {
+    clearAll();
+  }, [clearAll]);
 
   // Calculate statistics
   const stats = useMemo(() => {
@@ -118,42 +126,57 @@ function UploadPageContent() {
       !isUploading &&
       !showSuccessModal
     ) {
+      // Capture the count at the moment uploads complete
+      setCompletedUploadCount(stats.completedCount);
       setShowSuccessModal(true);
     }
   }, [stats.totalCount, stats.completedCount, stats.inProgressCount, isUploading, showSuccessModal]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--color-bg-secondary)]">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Upload Photos</h1>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">Upload Photos</h1>
+          <p className="text-[var(--color-text-secondary)] mt-1">Add photos to document your job site</p>
+        </div>
 
         <div className="space-y-6">
           {/* Property Selector */}
-          <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+          <Card variant="default" padding="lg">
+            <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-3">
               Select Property
             </label>
             {propertiesLoading ? (
-              <div className="text-gray-500">Loading properties...</div>
+              <div className="flex items-center gap-2 text-[var(--color-text-muted)]">
+                <div className="w-4 h-4 border-2 border-[var(--color-border)] border-t-[var(--color-primary)] rounded-full animate-spin" />
+                Loading properties...
+              </div>
             ) : (
-              <select
-                value={selectedPropertyId || ''}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    setSelectedPropertyId(e.target.value);
-                  }
-                }}
-                className="w-full max-w-xs px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-              >
-                <option value="">Select a property...</option>
-                {properties?.map((property) => (
-                  <option key={property.propertyId} value={property.propertyId}>
-                    {property.name} ({property.photoCount} photos)
-                  </option>
-                ))}
-              </select>
+              <div className="relative w-full max-w-md">
+                <select
+                  value={selectedPropertyId || ''}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setSelectedPropertyId(e.target.value);
+                    }
+                  }}
+                  className="w-full px-4 py-2.5 pr-10 border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-sm)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)] bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] font-medium appearance-none cursor-pointer transition-all duration-200 hover:border-[var(--color-primary)]/50"
+                >
+                  <option value="">Select a property...</option>
+                  {properties?.map((property) => (
+                    <option key={property.propertyId} value={property.propertyId}>
+                      {property.name} ({property.photoCount} photos)
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className="w-5 h-5 text-[var(--color-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
             )}
-          </div>
+          </Card>
 
           {/* File Upload Button */}
           <FileUploadButton
@@ -174,18 +197,21 @@ function UploadPageContent() {
 
           {/* Filter Tabs */}
           {stats.totalCount > 0 && (
-            <div className="flex gap-2 border-b border-gray-200">
+            <div className="flex gap-1 border-b border-[var(--color-border)] bg-[var(--color-bg-primary)] rounded-t-[var(--radius-lg)] px-2">
               {(['all', 'in-progress', 'failed', 'completed'] as const).map((f) => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  className={`px-4 py-3 text-sm font-medium transition-all duration-200 relative ${
                     filter === f
-                      ? 'border-b-2 border-blue-600 text-blue-600'
-                      : 'text-gray-600 hover:text-gray-900'
+                      ? 'text-[var(--color-primary)]'
+                      : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
                   }`}
                 >
                   {f.charAt(0).toUpperCase() + f.slice(1).replace('-', ' ')}
+                  {filter === f && (
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--color-primary)] rounded-t-full" />
+                  )}
                 </button>
               ))}
             </div>
@@ -207,7 +233,7 @@ function UploadPageContent() {
           isOpen={showSuccessModal}
           onClose={() => setShowSuccessModal(false)}
           propertyId={selectedPropertyId}
-          totalUploaded={stats.completedCount}
+          totalUploaded={completedUploadCount}
           timeElapsed={uploadStartTime ? (Date.now() - uploadStartTime) / 1000 : undefined}
         />
       </div>
@@ -218,8 +244,11 @@ function UploadPageContent() {
 export default function UploadPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-600">Loading upload page...</div>
+      <div className="min-h-screen bg-[var(--color-bg-secondary)] flex items-center justify-center">
+        <div className="flex items-center gap-3 text-[var(--color-text-secondary)]">
+          <div className="w-6 h-6 border-2 border-[var(--color-border)] border-t-[var(--color-primary)] rounded-full animate-spin" />
+          Loading upload page...
+        </div>
       </div>
     }>
       <UploadPageContent />

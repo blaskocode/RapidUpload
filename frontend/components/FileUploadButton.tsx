@@ -130,13 +130,15 @@ export default function FileUploadButton({
 
   return (
     <div
-      className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-all cursor-pointer ${
-        isDragging
-          ? 'border-blue-500 bg-blue-50 scale-105'
+      className={`
+        relative border-2 border-dashed rounded-[var(--radius-xl)] p-10 text-center transition-all duration-200 cursor-pointer
+        ${isDragging
+          ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] scale-[1.02]'
           : disabled
-          ? 'border-gray-300 bg-gray-50 cursor-not-allowed opacity-50'
-          : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50'
-      }`}
+          ? 'border-[var(--color-border)] bg-[var(--color-bg-tertiary)] cursor-not-allowed opacity-50'
+          : 'border-[var(--color-border)] bg-[var(--color-bg-primary)] hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)]/30'
+        }
+      `}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -157,28 +159,46 @@ export default function FileUploadButton({
         disabled={disabled}
         aria-label="File input"
       />
-      <div className="flex flex-col items-center gap-2">
-        <svg
-          className="w-12 h-12 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-          />
-        </svg>
-        <p className="text-lg font-medium text-gray-700">
-          {isDragging ? 'Drop files here' : 'Click to upload or drag and drop'}
-        </p>
-        <p className="text-sm text-gray-500">
-          Images only (up to {maxFiles} files, 50MB each)
-        </p>
+      <div className="flex flex-col items-center gap-4">
+        <div className={`
+          w-16 h-16 rounded-full flex items-center justify-center transition-colors duration-200
+          ${isDragging ? 'bg-[var(--color-primary)] text-white' : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)]'}
+        `}>
+          <svg
+            className="w-8 h-8"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+            />
+          </svg>
+        </div>
+        <div>
+          <p className="text-lg font-medium text-[var(--color-text-primary)]">
+            {isDragging ? 'Drop your photos here' : 'Drag and drop photos'}
+          </p>
+          <p className="text-sm text-[var(--color-text-secondary)] mt-1">
+            or <span className="text-[var(--color-primary)] font-medium">click to browse</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-4 text-xs text-[var(--color-text-muted)]">
+          <span className="flex items-center gap-1">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Images only
+          </span>
+          <span className="w-1 h-1 rounded-full bg-[var(--color-border)]" />
+          <span>Up to {maxFiles} files</span>
+          <span className="w-1 h-1 rounded-full bg-[var(--color-border)]" />
+          <span>50MB max each</span>
+        </div>
       </div>
     </div>
   );
 }
-

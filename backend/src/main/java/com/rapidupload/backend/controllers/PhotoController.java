@@ -113,6 +113,29 @@ public class PhotoController {
         return ResponseEntity.ok(photo);
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deletePhoto(@PathVariable String id) {
+        logger.info("Deleting photo: {}", id);
+        photoService.deletePhoto(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/delete/batch")
+    public ResponseEntity<Map<String, Object>> batchDeletePhotos(@RequestBody Map<String, List<String>> request) {
+        List<String> photoIds = request.get("photoIds");
+        if (photoIds == null || photoIds.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "photoIds is required"));
+        }
+
+        logger.info("Batch deleting {} photos", photoIds.size());
+        int deletedCount = photoService.batchDeletePhotos(photoIds);
+
+        return ResponseEntity.ok(Map.of(
+            "deletedCount", deletedCount,
+            "requestedCount", photoIds.size()
+        ));
+    }
+
     @PostMapping("/confirm-status")
     public ResponseEntity<ConfirmUploadResponse> confirmUploadStatus(@Valid @RequestBody ConfirmUploadRequest request) {
         try {

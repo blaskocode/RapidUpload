@@ -199,9 +199,26 @@ public class PropertyRepository {
     }
 
     /**
+     * Delete a property from the database
+     * @param propertyId The property to delete
+     */
+    public void deleteProperty(String propertyId) {
+        try {
+            Key key = Key.builder()
+                    .partitionValue(propertyId)
+                    .build();
+            propertyTable.deleteItem(key);
+            logger.info("Deleted property: {}", propertyId);
+        } catch (DynamoDbException e) {
+            logger.error("Failed to delete property: {}", propertyId, e);
+            throw new RuntimeException("Failed to delete property: " + propertyId, e);
+        }
+    }
+
+    /**
      * Atomically increment or decrement the photo count using DynamoDB's ADD expression.
      * This prevents race conditions when multiple uploads complete simultaneously.
-     * 
+     *
      * @param propertyId The property to update
      * @param increment The amount to add (can be negative to decrement)
      * @throws PropertyNotFoundException if the property doesn't exist

@@ -153,11 +153,36 @@ RapidPhotoUpload is a high-performance web application designed for property pro
 - Queue state persists across page refreshes
 - Users can clear completed uploads from queue view
 
-### 3.2 Deferred Features (Post-MVP)
+### 3.2 Implemented Post-MVP Features
 
-#### Phase 2 (Not in MVP):
+The following features have been implemented beyond the original MVP scope:
+
+#### Property Deletion (IMPLEMENTED)
+- **Delete Property**: Users can delete a property and all associated data
+- **Cascading Deletion**: Automatically deletes all photos, S3 objects, and analysis data
+- **Batch Operations**: Optimized with batch S3 and DynamoDB operations for performance
+- **Confirmation Modal**: Users must confirm deletion to prevent accidents
+
+#### Photo Deletion (IMPLEMENTED)
+- **Individual Photo Delete**: Delete single photos from hover action or lightbox
+- **Bulk Photo Delete**: Selection mode for mass deletion of multiple photos
+- **Select All/Deselect All**: Quick selection controls in selection mode
+- **Failed Image Deletion**: Delete photos that failed to load directly from error state
+
+#### AI Photo Analysis (IMPLEMENTED)
+- **Analyze All Button**: Batch analyze all photos in a property with one click
+- **Analysis Status Badges**: Visual indicators for analyzed/pending/failed states
+- **Analysis Results Panel**: View detected objects, confidence scores, and details
+- **Bounding Box Overlay**: Visual display of AI-detected object locations
+
+#### Report Generation (IMPLEMENTED)
+- **PDF Reports**: Generate property inspection reports with photos and analysis
+- **Excel Reports**: Export data to spreadsheet format
+
+### 3.3 Deferred Features (Future Phases)
+
+#### Phase 2 (Not Yet Implemented):
 - User authentication & authorization
-- AI-powered auto-tagging of photos
 - Bulk photo download (single or multiple)
 - Photo metadata editing (captions, notes, room types)
 - Search & filter functionality
@@ -324,18 +349,29 @@ RapidPhotoUpload is a high-performance web application designed for property pro
 
 #### Property Endpoints
 ```
-POST   /api/properties              Create new property
-GET    /api/properties              List all properties
-GET    /api/properties/{id}         Get property details
-GET    /api/properties/{id}/photos  Get photos for property
+POST   /api/properties                           Create new property
+GET    /api/properties                           List all properties
+GET    /api/properties/{id}                      Get property details
+DELETE /api/properties/{id}                      Delete property (cascading)
+GET    /api/properties/{id}/photos               Get photos for property (paginated)
+POST   /api/properties/recalculate-photo-counts  Recalculate all photo counts
 ```
 
-#### Photo Upload Endpoints
+#### Photo Endpoints
 ```
 POST   /api/photos/presigned-url    Generate pre-signed S3 URL
 POST   /api/photos/confirm          Confirm successful upload
 GET    /api/photos/{id}             Get photo metadata
-DELETE /api/photos/{id}             Delete photo (Phase 2)
+DELETE /api/photos/{id}             Delete single photo
+POST   /api/photos/delete/batch     Batch delete photos
+POST   /api/photos/{id}/analyze     Analyze single photo
+POST   /api/photos/analyze/batch    Batch analyze photos
+```
+
+#### Report Endpoints
+```
+GET    /api/reports/property/{id}/pdf    Generate PDF report
+GET    /api/reports/property/{id}/excel  Generate Excel report
 ```
 
 **Request/Response Examples:**
@@ -555,6 +591,7 @@ Response:
 
 ---
 
-**Document Status:** Final  
-**Approval Required From:** Gauntlet AI, Teamfront  
-**Next Steps:** Review PRD → Create Task List → Begin Development
+**Document Status:** Updated (Post-MVP Implementation)
+**Last Updated:** November 28, 2025
+**Approval Required From:** Gauntlet AI, Teamfront
+**Next Steps:** Review implemented features → Plan Phase 2 authentication

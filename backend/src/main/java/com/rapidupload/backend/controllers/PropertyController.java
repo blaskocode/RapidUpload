@@ -89,5 +89,17 @@ public class PropertyController {
         PropertyResponse property = propertyService.recalculatePhotoCount(id);
         return ResponseEntity.ok(property);
     }
+
+    @PostMapping("/recalculate-all-counts")
+    public ResponseEntity<List<PropertyResponse>> recalculateAllPhotoCounts() {
+        List<PropertyResponse> properties = propertyService.recalculateAllPhotoCounts();
+        return ResponseEntity.ok(properties);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteProperty(@PathVariable String id) {
+        propertyService.deleteProperty(id);
+        return ResponseEntity.noContent().build();
+    }
 }
 

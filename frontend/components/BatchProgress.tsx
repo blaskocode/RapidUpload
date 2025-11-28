@@ -1,6 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
+import Card from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
 
 interface BatchProgressProps {
   totalCount: number;
@@ -52,14 +54,10 @@ export default function BatchProgress({
       return null;
     }
 
-    // Estimate remaining bytes (rough estimate: assume average file size)
-    // This is a simplified calculation - in a real app, you'd track actual remaining bytes
     const remainingFiles = totalCount - completedCount - failedCount;
     if (remainingFiles <= 0) return null;
 
-    // Estimate: assume average file size based on completed uploads
-    // For simplicity, we'll use a rough estimate
-    const estimatedBytesPerFile = avgUploadSpeed > 0 ? (avgUploadSpeed * 10) : 1024 * 1024; // Rough estimate
+    const estimatedBytesPerFile = avgUploadSpeed > 0 ? (avgUploadSpeed * 10) : 1024 * 1024;
     const remainingBytes = remainingFiles * estimatedBytesPerFile;
     const estimatedSeconds = remainingBytes / avgUploadSpeed;
 
@@ -68,26 +66,37 @@ export default function BatchProgress({
 
   if (totalCount === 0) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-        <p className="text-gray-500 text-center">No uploads in queue</p>
-      </div>
+      <Card variant="default" padding="lg">
+        <p className="text-[var(--color-text-muted)] text-center">No uploads in queue</p>
+      </Card>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-      <div className="flex items-center justify-between mb-4">
+    <Card variant="default" padding="lg">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Upload Progress</h3>
-          <div className="flex items-center gap-4 mt-2 text-sm">
-            <span className="text-gray-600">
-              <span className="font-medium text-green-600">{completedCount}</span>
-              {' / '}
-              <span className="font-medium text-gray-900">{totalCount}</span>
-              {' uploaded'}
+          <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Upload Progress</h3>
+          <div className="flex flex-wrap items-center gap-3 mt-1.5 text-sm">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[var(--color-success)]" />
+              <span className="text-[var(--color-text-secondary)]">
+                <span className="font-semibold text-[var(--color-success)]">{completedCount}</span>
+                {' / '}
+                <span className="font-medium text-[var(--color-text-primary)]">{totalCount}</span>
+              </span>
             </span>
             {failedCount > 0 && (
-              <span className="text-red-600 font-medium">{failedCount} failed</span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[var(--color-error)]" />
+                <span className="font-medium text-[var(--color-error)]">{failedCount} failed</span>
+              </span>
+            )}
+            {inProgressCount > 0 && (
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[var(--color-primary)] animate-pulse" />
+                <span className="text-[var(--color-text-secondary)]">{inProgressCount} uploading</span>
+              </span>
             )}
           </div>
         </div>
@@ -95,52 +104,53 @@ export default function BatchProgress({
           {inProgressCount > 0 && (
             <>
               {isPaused ? (
-                <button
-                  onClick={onResume}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
-                >
+                <Button variant="primary" size="sm" onClick={onResume}>
                   Resume
-                </button>
+                </Button>
               ) : (
-                <button
-                  onClick={onPause}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors text-sm font-medium"
-                >
+                <Button variant="secondary" size="sm" onClick={onPause}>
                   Pause
-                </button>
+                </Button>
               )}
             </>
           )}
           {completedCount > 0 && onClearCompleted && (
-            <button
-              onClick={onClearCompleted}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm font-medium"
-            >
+            <Button variant="ghost" size="sm" onClick={onClearCompleted}>
               Clear Completed
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
-      <div className="mb-4">
-        <div className="w-full bg-gray-200 rounded-full h-3">
+      {/* Progress bar */}
+      <div className="mb-3">
+        <div className="w-full bg-[var(--color-bg-tertiary)] rounded-full h-2.5 overflow-hidden">
           <div
-            className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
+            className="h-full rounded-full transition-all duration-300 ease-out bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary-hover)]"
             style={{ width: `${progress}%` }}
           />
         </div>
-        <div className="flex justify-between items-center mt-2 text-sm text-gray-600">
-          <span>{progress}% complete</span>
+        <div className="flex justify-between items-center mt-2 text-sm">
+          <span className="text-[var(--color-text-secondary)] font-medium">{progress}% complete</span>
           {avgUploadSpeed > 0 && (
-            <span className="text-gray-500">{formatSpeed(avgUploadSpeed)}</span>
+            <span className="text-[var(--color-text-muted)] flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+              {formatSpeed(avgUploadSpeed)}
+            </span>
           )}
         </div>
       </div>
 
       {timeRemaining && (
-        <p className="text-sm text-gray-600">{timeRemaining}</p>
+        <p className="text-sm text-[var(--color-text-muted)] flex items-center gap-1.5">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {timeRemaining}
+        </p>
       )}
-    </div>
+    </Card>
   );
 }
-

@@ -66,6 +66,62 @@ public class AnalysisRepository {
         logger.info("Updated analysis: {}", analysis.getAnalysisId());
     }
 
+    public void deleteAnalysis(String analysisId) {
+        Key key = Key.builder().partitionValue(analysisId).build();
+        analysisTable.deleteItem(key);
+        logger.info("Deleted analysis: {}", analysisId);
+    }
+
+    /**
+     * Batch delete analysis results by IDs.
+     * DynamoDB batch write supports up to 25 items per request.
+     */
+    public void batchDeleteAnalysis(List<String> analysisIds) {
+        if (analysisIds == null || analysisIds.isEmpty()) {
+            return;
+        }
+
+        logger.info("Batch deleting {} analysis results", analysisIds.size());
+        int batchSize = 25;
+
+        for (int i = 0; i < analysisIds.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, analysisIds.size());
+            List<String> batch = analysisIds.subList(i, end);
+
+            WriteBatch.Builder<AnalysisResult> writeBatchBuilder = WriteBatch.builder(AnalysisResult.class)
+                    .mappedTableResource(analysisTable);
+
+            for (String analysisId : batch) {
+                writeBatchBuilder.addDeleteItem(Key.builder().partitionValue(analysisId).build());
+            }
+
+            BatchWriteItemEnhancedRequest batchRequest = BatchWriteItemEnhancedRequest.builder()
+                    .writeBatches(writeBatchBuilder.build())
+                    .build();
+
+            enhancedClient.batchWriteItem(batchRequest);
+            logger.debug("Batch deleted {} analysis results", batch.size());
+        }
+
+        logger.info("Successfully batch deleted {} analysis results", analysisIds.size());
+    }
+
+    /**
+     * Get all analysis results for a property (unpaginated, for deletion)
+     */
+    public List<AnalysisResult> getAllAnalysisByProperty(String propertyId) {
+        List<AnalysisResult> allResults = new ArrayList<>();
+        Map<String, String> lastKey = null;
+
+        do {
+            PagedResponse<AnalysisResult> page = listAnalysisByProperty(propertyId, 100, lastKey);
+            allResults.addAll(page.getItems());
+            lastKey = page.getLastEvaluatedKey();
+        } while (lastKey != null && !lastKey.isEmpty());
+
+        return allResults;
+    }
+
     public PagedResponse<AnalysisResult> listAnalysisByProperty(String propertyId, Integer limit, Map<String, String> exclusiveStartKey) {
         int pageSize = limit != null ? Math.min(Math.max(limit, 1), 100) : 50;
 

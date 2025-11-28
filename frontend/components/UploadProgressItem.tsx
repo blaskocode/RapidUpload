@@ -2,6 +2,7 @@
 
 import { memo } from 'react';
 import type { UploadStatus } from '@/types/upload';
+import Button from '@/components/ui/Button';
 
 interface UploadProgressItemProps {
   photoId: string;
@@ -38,18 +39,18 @@ const UploadProgressItem = memo(function UploadProgressItem({
   onRetry,
   onCancel,
 }: UploadProgressItemProps) {
-  const getStatusColor = () => {
+  const getStatusStyles = () => {
     switch (status) {
       case 'queued':
-        return 'bg-gray-100 text-gray-600';
+        return 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]';
       case 'uploading':
-        return 'bg-blue-100 text-blue-600 animate-pulse';
+        return 'bg-[var(--color-primary-light)] text-[var(--color-primary)] animate-pulse';
       case 'complete':
-        return 'bg-green-100 text-green-600';
+        return 'bg-[var(--color-success-light)] text-[var(--color-success)]';
       case 'failed':
-        return 'bg-red-100 text-red-600';
+        return 'bg-[var(--color-error-light)] text-[var(--color-error)]';
       default:
-        return 'bg-gray-100 text-gray-600';
+        return 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]';
     }
   };
 
@@ -57,13 +58,13 @@ const UploadProgressItem = memo(function UploadProgressItem({
     switch (status) {
       case 'queued':
         return (
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
             <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" />
           </svg>
         );
       case 'uploading':
         return (
-          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+          <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path
               className="opacity-75"
@@ -74,7 +75,7 @@ const UploadProgressItem = memo(function UploadProgressItem({
         );
       case 'complete':
         return (
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
             <path
               fillRule="evenodd"
               d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -84,7 +85,7 @@ const UploadProgressItem = memo(function UploadProgressItem({
         );
       case 'failed':
         return (
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
             <path
               fillRule="evenodd"
               d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
@@ -96,58 +97,60 @@ const UploadProgressItem = memo(function UploadProgressItem({
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+    <div className="bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-[var(--radius-lg)] p-4 hover:shadow-[var(--shadow-sm)] transition-all duration-200">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor()}`}>
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${getStatusStyles()}`}>
             {getStatusIcon()}
             <span className="capitalize">{status}</span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate" title={filename}>
+            <p className="text-sm font-medium text-[var(--color-text-primary)] truncate" title={filename}>
               {truncateFilename(filename)}
             </p>
-            <p className="text-xs text-gray-500">{formatFileSize(size)}</p>
+            <p className="text-xs text-[var(--color-text-muted)]">{formatFileSize(size)}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {status === 'uploading' && onCancel && (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => onCancel(photoId)}
-              className="px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors"
-              aria-label="Cancel upload"
+              className="text-[var(--color-error)] hover:bg-[var(--color-error-light)]"
             >
               Cancel
-            </button>
+            </Button>
           )}
           {status === 'failed' && onRetry && (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => onRetry(photoId)}
-              className="px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-              aria-label="Retry upload"
+              className="text-[var(--color-primary)] hover:bg-[var(--color-primary-light)]"
             >
               Retry
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
       {status === 'uploading' && (
-        <div className="mt-2">
-          <div className="w-full bg-gray-200 rounded-full h-2">
+        <div className="mt-3">
+          <div className="w-full bg-[var(--color-bg-tertiary)] rounded-full h-1.5 overflow-hidden">
             <div
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+              className="h-full rounded-full transition-all duration-300 ease-out bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary-hover)]"
               style={{ width: `${progress}%` }}
             />
           </div>
-          <p className="text-xs text-gray-500 mt-1 text-right">{progress}%</p>
+          <p className="text-xs text-[var(--color-text-muted)] mt-1.5 text-right font-medium">{progress}%</p>
         </div>
       )}
 
       {status === 'failed' && error && (
-        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-          <p className="font-medium">Error:</p>
-          <p className="mt-1">{error}</p>
+        <div className="mt-3 p-3 bg-[var(--color-error-light)] border border-[var(--color-error)]/20 rounded-[var(--radius-md)] text-xs text-[var(--color-error)]">
+          <p className="font-semibold">Error:</p>
+          <p className="mt-1 opacity-90">{error}</p>
         </div>
       )}
     </div>

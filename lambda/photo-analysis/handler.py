@@ -133,6 +133,7 @@ Identify all visible items and provide bounding boxes. For each detection:
 - category: One of "damage", "material", or "other"
 - confidence: Your confidence 0-100 (be conservative - use 60-80 for uncertain items)
 - boundingBox: Normalized coordinates (0-1 scale) with left, top, width, height
+- count: For materials, how many of this item are visible
 
 TASK 2 - DAMAGE ASSESSMENT:
 Evaluate any roof damage visible:
@@ -142,17 +143,25 @@ Evaluate any roof damage visible:
 
 TASK 3 - MATERIAL INVENTORY:
 Count visible construction materials:
-- Focus on shingle bundles and plywood sheets
+- Focus on shingle bundles, plywood sheets, and other roofing materials
 - Provide count and any brand/type visible
+- List each detected material type in the materials array
 
 Respond ONLY with valid JSON in this exact format:
 {
     "detections": [
         {
+            "label": "Shingle bundle",
+            "category": "material",
+            "confidence": 85,
+            "boundingBox": {"left": 0.1, "top": 0.2, "width": 0.3, "height": 0.2},
+            "count": 5
+        },
+        {
             "label": "Hail damage",
             "category": "damage",
             "confidence": 75,
-            "boundingBox": {"left": 0.1, "top": 0.2, "width": 0.3, "height": 0.2}
+            "boundingBox": {"left": 0.4, "top": 0.3, "width": 0.2, "height": 0.15}
         }
     ],
     "analysis": {
@@ -160,6 +169,10 @@ Respond ONLY with valid JSON in this exact format:
             "severity": "moderate",
             "description": "Multiple hail impact marks visible on shingles",
             "damageTypes": ["hail"]
+        },
+        "materials": {
+            "detected": ["Shingle bundles", "Plywood sheets"],
+            "description": "5 GAF Timberline shingle bundles and 3 plywood sheets visible"
         },
         "materialInventory": {
             "items": [{"type": "shingles", "count": 5, "notes": "GAF Timberline bundles"}],

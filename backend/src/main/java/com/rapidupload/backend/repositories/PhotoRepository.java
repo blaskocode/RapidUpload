@@ -130,6 +130,44 @@ public class PhotoRepository {
         }
     }
 
+    /**
+     * Batch delete photos by IDs.
+     * DynamoDB batch write supports up to 25 items per request.
+     */
+    public void batchDeletePhotos(List<String> photoIds) {
+        if (photoIds == null || photoIds.isEmpty()) {
+            return;
+        }
+
+        logger.info("Batch deleting {} photos", photoIds.size());
+
+        for (int i = 0; i < photoIds.size(); i += BATCH_WRITE_SIZE) {
+            int end = Math.min(i + BATCH_WRITE_SIZE, photoIds.size());
+            List<String> batch = photoIds.subList(i, end);
+            final int batchNumber = (i / BATCH_WRITE_SIZE) + 1;
+            final int totalBatches = (photoIds.size() + BATCH_WRITE_SIZE - 1) / BATCH_WRITE_SIZE;
+
+            executeWithRetry(() -> {
+                WriteBatch.Builder<Photo> writeBatchBuilder = WriteBatch.builder(Photo.class)
+                        .mappedTableResource(photoTable);
+
+                for (String photoId : batch) {
+                    writeBatchBuilder.addDeleteItem(Key.builder().partitionValue(photoId).build());
+                }
+
+                BatchWriteItemEnhancedRequest batchRequest = BatchWriteItemEnhancedRequest.builder()
+                        .writeBatches(writeBatchBuilder.build())
+                        .build();
+
+                enhancedClient.batchWriteItem(batchRequest);
+                logger.debug("Batch deleted {} photos (batch {}/{})", batch.size(), batchNumber, totalBatches);
+                return null;
+            }, "batchDeletePhotos");
+        }
+
+        logger.info("Successfully batch deleted {} photos", photoIds.size());
+    }
+
     public PagedResponse<Photo> listPhotosByProperty(String propertyId, Integer limit, Map<String, String> exclusiveStartKey) {
         try {
             // Default page size is 50, maximum is 100
@@ -276,6 +314,22 @@ public class PhotoRepository {
         }
 
         return photos;
+    }
+
+    /**
+     * Get all photos for a property (unpaginated, for deletion)
+     */
+    public List<Photo> getAllPhotosByProperty(String propertyId) {
+        List<Photo> allPhotos = new ArrayList<>();
+        Map<String, String> lastKey = null;
+
+        do {
+            PagedResponse<Photo> page = listPhotosByProperty(propertyId, 100, lastKey);
+            allPhotos.addAll(page.getItems());
+            lastKey = page.getLastEvaluatedKey();
+        } while (lastKey != null && !lastKey.isEmpty());
+
+        return allPhotos;
     }
 
     private <T> T executeWithRetry(java.util.function.Supplier<T> operation, String operationName) {

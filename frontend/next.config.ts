@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Production optimizations
+  poweredByHeader: false,
+  reactStrictMode: true,
+
   images: {
     remotePatterns: [
       {
@@ -14,6 +18,10 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: '**.s3.*.amazonaws.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'rapidupload-photos.s3.us-east-1.amazonaws.com',
       },
     ],
     formats: ['image/avif', 'image/webp'],

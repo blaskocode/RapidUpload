@@ -5,9 +5,11 @@ import com.rapidupload.backend.dto.PagedPhotoResponse;
 import com.rapidupload.backend.dto.PhotoResponse;
 import com.rapidupload.backend.dto.PropertyResponse;
 import com.rapidupload.backend.exceptions.PropertyNotFoundException;
+import com.rapidupload.backend.models.AnalysisResult;
 import com.rapidupload.backend.models.PagedResponse;
 import com.rapidupload.backend.models.Photo;
 import com.rapidupload.backend.models.Property;
+import com.rapidupload.backend.repositories.AnalysisRepository;
 import com.rapidupload.backend.repositories.PhotoRepository;
 import com.rapidupload.backend.repositories.PropertyRepository;
 import org.slf4j.Logger;
@@ -15,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -26,11 +29,14 @@ public class PropertyService {
 
     private final PropertyRepository propertyRepository;
     private final PhotoRepository photoRepository;
+    private final AnalysisRepository analysisRepository;
     private final S3Service s3Service;
 
-    public PropertyService(PropertyRepository propertyRepository, PhotoRepository photoRepository, S3Service s3Service) {
+    public PropertyService(PropertyRepository propertyRepository, PhotoRepository photoRepository,
+                          AnalysisRepository analysisRepository, S3Service s3Service) {
         this.propertyRepository = propertyRepository;
         this.photoRepository = photoRepository;
+        this.analysisRepository = analysisRepository;
         this.s3Service = s3Service;
     }
 
@@ -42,6 +48,53 @@ public class PropertyService {
     public PropertyResponse getProperty(String propertyId) {
         Property property = propertyRepository.getProperty(propertyId);
         return toPropertyResponse(property);
+    }
+
+    /**
+     * Delete a property and all associated data (photos, S3 objects, analysis results)
+     * Uses batch operations for performance.
+     */
+    public void deleteProperty(String propertyId) {
+        // Verify property exists
+        propertyRepository.getProperty(propertyId);
+
+        logger.info("Deleting property: {} and all associated data", propertyId);
+
+        // 1. Get all photos for the property
+        List<Photo> photos = photoRepository.getAllPhotosByProperty(propertyId);
+        logger.info("Found {} photos to delete for property: {}", photos.size(), propertyId);
+
+        // 2. Batch delete S3 objects
+        List<String> s3Keys = photos.stream()
+                .map(Photo::getS3Key)
+                .filter(key -> key != null)
+                .collect(Collectors.toList());
+        if (!s3Keys.isEmpty()) {
+            s3Service.deleteObjects(s3Keys);
+        }
+
+        // 3. Batch delete photos from DynamoDB
+        List<String> photoIds = photos.stream()
+                .map(Photo::getPhotoId)
+                .collect(Collectors.toList());
+        if (!photoIds.isEmpty()) {
+            photoRepository.batchDeletePhotos(photoIds);
+        }
+
+        // 4. Get and batch delete all analysis results for the property
+        List<AnalysisResult> analysisResults = analysisRepository.getAllAnalysisByProperty(propertyId);
+        logger.info("Found {} analysis results to delete for property: {}", analysisResults.size(), propertyId);
+        List<String> analysisIds = analysisResults.stream()
+                .map(AnalysisResult::getAnalysisId)
+                .collect(Collectors.toList());
+        if (!analysisIds.isEmpty()) {
+            analysisRepository.batchDeleteAnalysis(analysisIds);
+        }
+
+        // 5. Delete the property itself
+        propertyRepository.deleteProperty(propertyId);
+
+        logger.info("Successfully deleted property: {} and all associated data", propertyId);
     }
 
     public List<PropertyResponse> listProperties() {
@@ -148,33 +201,57 @@ public class PropertyService {
     }
 
     /**
-     * Recalculates and updates the PhotoCount for a property by counting photos with status='uploaded'
+     * Recalculates and updates the PhotoCount for a property by counting all photos
+     * (including those with null status from legacy uploads, or status='uploaded')
      * This is called after batch uploads complete to ensure accurate count without transaction conflicts
      */
     public PropertyResponse recalculatePhotoCount(String propertyId) {
         // Verify property exists
         Property property = propertyRepository.getProperty(propertyId);
-        
-        // Count photos with status='uploaded' for this property
-        // We'll use pagination to count all photos
+
+        // Count all photos for this property (not just uploaded status)
+        // Photos with null status are likely valid legacy uploads
         int totalCount = 0;
         Map<String, String> lastKey = null;
-        
+
         do {
             PagedResponse<Photo> page = photoRepository.listPhotosByProperty(propertyId, 100, lastKey);
-            // Count only uploaded photos
-            long uploadedCount = page.getItems().stream()
-                    .filter(photo -> "uploaded".equals(photo.getStatus()))
+            // Count all photos - null status or 'uploaded' status are valid
+            long validCount = page.getItems().stream()
+                    .filter(photo -> photo.getStatus() == null || "uploaded".equals(photo.getStatus()))
                     .count();
-            totalCount += (int) uploadedCount;
+            totalCount += (int) validCount;
             lastKey = page.getLastEvaluatedKey();
         } while (lastKey != null && !lastKey.isEmpty());
-        
+
         // Update property with new count
         property.setPhotoCount(totalCount);
         propertyRepository.updateProperty(property);
-        
+
+        logger.info("Recalculated photo count for property {}: {}", propertyId, totalCount);
         return toPropertyResponse(property);
+    }
+
+    /**
+     * Recalculates photo counts for all properties.
+     * Useful for fixing incorrect counts after data migrations or bugs.
+     */
+    public List<PropertyResponse> recalculateAllPhotoCounts() {
+        List<Property> properties = propertyRepository.listProperties();
+        logger.info("Recalculating photo counts for {} properties", properties.size());
+
+        List<PropertyResponse> results = new ArrayList<>();
+        for (Property property : properties) {
+            try {
+                PropertyResponse updated = recalculatePhotoCount(property.getPropertyId());
+                results.add(updated);
+            } catch (Exception e) {
+                logger.error("Failed to recalculate count for property {}: {}", property.getPropertyId(), e.getMessage());
+            }
+        }
+
+        logger.info("Finished recalculating photo counts for {} properties", results.size());
+        return results;
     }
 
     private PropertyResponse toPropertyResponse(Property property) {

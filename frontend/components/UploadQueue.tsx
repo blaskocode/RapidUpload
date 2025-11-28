@@ -3,6 +3,8 @@
 import { useMemo, useRef, useCallback, useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import UploadProgressItem from './UploadProgressItem';
+import Card from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
 import type { QueuedPhoto, UploadStatus } from '@/types/upload';
 import { useUploadStore } from '@/stores/uploadStore';
 
@@ -20,7 +22,6 @@ interface UploadQueueProps {
 }
 
 const ITEM_HEIGHT = 100;
-const EXPANDED_ITEM_HEIGHT = 140;
 
 export default function UploadQueue({
   queue,
@@ -30,11 +31,10 @@ export default function UploadQueue({
 }: UploadQueueProps) {
   const listRef = useRef<any>(null);
   const [isClient, setIsClient] = useState(false);
-  
+
   useEffect(() => {
     setIsClient(true);
   }, []);
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const uploadStatus = useUploadStore((state) => state.uploadStatus);
 
   const filteredQueue = useMemo(() => {
@@ -55,18 +55,18 @@ export default function UploadQueue({
   }, [queue, filter, uploadStatus]);
 
   const Row = useCallback(
-    ({ index, style, ariaAttributes }: { 
-      index: number; 
+    ({ index, style, ariaAttributes }: {
+      index: number;
       style: React.CSSProperties;
-      ariaAttributes: { 
-        'aria-posinset': number; 
-        'aria-setsize': number; 
-        role: 'listitem' 
+      ariaAttributes: {
+        'aria-posinset': number;
+        'aria-setsize': number;
+        role: 'listitem'
       };
     }) => {
       const photo = filteredQueue[index];
       if (!photo) {
-        return <div style={style} className="px-2" {...ariaAttributes} />;
+        return <div style={style} className="px-3" {...ariaAttributes} />;
       }
 
       const status = uploadStatus[photo.photoId];
@@ -75,7 +75,7 @@ export default function UploadQueue({
       const error = status?.error;
 
       return (
-        <div style={style} className="px-2" {...ariaAttributes}>
+        <div style={style} className="px-3" {...ariaAttributes}>
           <UploadProgressItem
             photoId={photo.photoId}
             filename={photo.filename}
@@ -103,35 +103,52 @@ export default function UploadQueue({
 
   if (filteredQueue.length === 0) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-        <p className="text-gray-500">No items in queue</p>
-      </div>
+      <Card variant="default" padding="lg">
+        <div className="text-center py-8">
+          <div className="w-12 h-12 rounded-full bg-[var(--color-bg-tertiary)] flex items-center justify-center mx-auto mb-3">
+            <svg className="w-6 h-6 text-[var(--color-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <p className="text-[var(--color-text-muted)]">No items in queue</p>
+        </div>
+      </Card>
     );
   }
 
   // Don't render the virtualized list until client-side hydration is complete
   if (!isClient) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-        <p className="text-gray-500">Loading queue...</p>
-      </div>
+      <Card variant="default" padding="lg">
+        <div className="text-center py-8">
+          <div className="w-8 h-8 border-2 border-[var(--color-border)] border-t-[var(--color-primary)] rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-[var(--color-text-muted)]">Loading queue...</p>
+        </div>
+      </Card>
     );
   }
 
+  const hasFailedItems = filteredQueue.some((p) => uploadStatus[p.photoId]?.status === 'failed');
+
   return (
-    <div className="bg-white rounded-lg border border-gray-200">
-      <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-700">
+    <Card variant="default" padding="none">
+      <div className="p-4 border-b border-[var(--color-border)] flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-semibold text-[var(--color-text-primary)]">
             {filteredQueue.length} item{filteredQueue.length !== 1 ? 's' : ''}
           </span>
-          {filter === 'all' && filteredQueue.some((p) => uploadStatus[p.photoId]?.status === 'failed') && (
-            <button
+          {filter === 'all' && hasFailedItems && (
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={scrollToFailed}
-              className="text-xs text-red-600 hover:text-red-700 font-medium"
+              className="text-[var(--color-error)] hover:bg-[var(--color-error-light)]"
             >
+              <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+              </svg>
               Jump to failed
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -146,7 +163,7 @@ export default function UploadQueue({
           rowProps={{}}
         />
       </div>
-    </div>
+    </Card>
   );
 }
 

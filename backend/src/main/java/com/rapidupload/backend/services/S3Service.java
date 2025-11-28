@@ -7,16 +7,23 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.Delete;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectsResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -106,6 +113,69 @@ public class S3Service {
                 PRESIGNED_URL_EXPIRATION_MINUTES * 60, // expiresIn in seconds
                 fields
         );
+    }
+
+    /**
+     * Delete an object from S3.
+     * @param s3Key The key of the object to delete
+     */
+    public void deleteObject(String s3Key) {
+        try {
+            DeleteObjectRequest request = DeleteObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(s3Key)
+                    .build();
+            s3Client.deleteObject(request);
+            logger.info("Deleted object from S3: {}", s3Key);
+        } catch (Exception e) {
+            logger.error("Error deleting object from S3 {}: {}", s3Key, e.getMessage());
+            // Don't throw - deletion should be best-effort
+        }
+    }
+
+    /**
+     * Batch delete objects from S3. S3 supports up to 1000 objects per request.
+     * @param s3Keys List of keys to delete
+     * @return Number of successfully deleted objects
+     */
+    public int deleteObjects(List<String> s3Keys) {
+        if (s3Keys == null || s3Keys.isEmpty()) {
+            return 0;
+        }
+
+        int totalDeleted = 0;
+        int batchSize = 1000; // S3 limit
+
+        for (int i = 0; i < s3Keys.size(); i += batchSize) {
+            List<String> batch = s3Keys.subList(i, Math.min(i + batchSize, s3Keys.size()));
+
+            try {
+                List<ObjectIdentifier> objectIds = new ArrayList<>();
+                for (String key : batch) {
+                    objectIds.add(ObjectIdentifier.builder().key(key).build());
+                }
+
+                DeleteObjectsRequest request = DeleteObjectsRequest.builder()
+                        .bucket(bucketName)
+                        .delete(Delete.builder().objects(objectIds).quiet(true).build())
+                        .build();
+
+                DeleteObjectsResponse response = s3Client.deleteObjects(request);
+                int deleted = batch.size() - (response.errors() != null ? response.errors().size() : 0);
+                totalDeleted += deleted;
+
+                if (response.errors() != null && !response.errors().isEmpty()) {
+                    logger.warn("Some S3 deletions failed: {} errors", response.errors().size());
+                }
+
+                logger.info("Batch deleted {} objects from S3", deleted);
+            } catch (Exception e) {
+                logger.error("Error batch deleting objects from S3: {}", e.getMessage());
+                // Don't throw - deletion should be best-effort
+            }
+        }
+
+        return totalDeleted;
     }
 }
 

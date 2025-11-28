@@ -117,3 +117,38 @@ export function useCreateProperty() {
   });
 }
 
+// Delete property mutation
+export function useDeleteProperty() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, string, { previousProperties?: Property[] }>({
+    mutationFn: async (propertyId: string) => {
+      await api.delete(`/properties/${propertyId}`);
+    },
+    onMutate: async (propertyId) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: propertyKeys.list() });
+
+      // Snapshot previous value
+      const previousProperties = queryClient.getQueryData<Property[]>(propertyKeys.list());
+
+      // Optimistically remove from cache
+      queryClient.setQueryData<Property[]>(propertyKeys.list(), (old = []) =>
+        old.filter((p) => p.propertyId !== propertyId)
+      );
+
+      return { previousProperties };
+    },
+    onError: (err, propertyId, context) => {
+      // Rollback on error
+      if (context?.previousProperties) {
+        queryClient.setQueryData(propertyKeys.list(), context.previousProperties);
+      }
+    },
+    onSuccess: () => {
+      // Invalidate and refetch
+      queryClient.invalidateQueries({ queryKey: propertyKeys.list() });
+    },
+  });
+}
+
