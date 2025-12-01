@@ -46,7 +46,7 @@ export interface BoundingBox {
 export interface Detection {
   label: string;
   category: 'damage' | 'material' | 'other';
-  confidence: number;
+  confidence?: number;  // Optional - Gemini doesn't provide this
   boundingBox?: BoundingBox;
   count?: number;
 }
@@ -61,7 +61,7 @@ export interface AnalysisResult {
   detections: Detection[];
   claudeAnalysis?: string;
   errorMessage?: string;
-  lowConfidence: boolean;
+  lowConfidence?: boolean;  // Deprecated - kept for backwards compatibility
 }
 
 export interface PagedAnalysisResponse {

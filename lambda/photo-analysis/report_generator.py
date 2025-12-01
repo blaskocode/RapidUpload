@@ -60,8 +60,8 @@ def create_annotated_image(image_bytes, detections):
             width=3
         )
 
-        # Draw label background
-        label = f"{detection.get('label', 'Unknown')} ({float(detection.get('confidence', 0)):.0f}%)"
+        # Draw label background (without confidence)
+        label = f"{detection.get('label', 'Unknown')}"
         label_bbox = draw.textbbox((left, top - 20), label, font=font)
         draw.rectangle(label_bbox, fill=(0, 0, 0, 180))
         draw.text((left, top - 20), label, fill=(255, 255, 255, 255), font=font)
@@ -207,20 +207,17 @@ def generate_pdf_report(property_name, photos_data, output_path=None):
         if damage_detections:
             story.append(Paragraph("Damage Detected:", normal_style))
             for d in damage_detections:
-                conf = float(d.get('confidence', 0))
-                warning = " [LOW CONFIDENCE]" if conf < 60 else ""
                 story.append(Paragraph(
-                    f"  - {d.get('label')}: {conf:.0f}% confidence{warning}",
+                    f"  - {d.get('label')}",
                     normal_style
                 ))
 
         if material_detections:
             story.append(Paragraph("Materials Detected:", normal_style))
             for d in material_detections:
-                conf = float(d.get('confidence', 0))
                 count = d.get('count', 1)
                 story.append(Paragraph(
-                    f"  - {d.get('label')}: {count} unit(s), {conf:.0f}% confidence",
+                    f"  - {d.get('label')}: {count} unit(s)",
                     normal_style
                 ))
 

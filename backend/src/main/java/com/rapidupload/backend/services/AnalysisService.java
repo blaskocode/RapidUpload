@@ -23,7 +23,6 @@ import java.util.stream.Collectors;
 @Service
 public class AnalysisService {
     private static final Logger logger = LoggerFactory.getLogger(AnalysisService.class);
-    private static final double LOW_CONFIDENCE_THRESHOLD = 60.0;
 
     private final AnalysisRepository analysisRepository;
     private final PhotoRepository photoRepository;
@@ -141,13 +140,8 @@ public class AnalysisService {
         response.setClaudeAnalysis(result.getClaudeAnalysis());
         response.setErrorMessage(result.getErrorMessage());
 
-        // Check for low confidence detections
-        boolean lowConfidence = false;
-        if (result.getDetections() != null) {
-            lowConfidence = result.getDetections().stream()
-                    .anyMatch(d -> d.getConfidence() != null && d.getConfidence() < LOW_CONFIDENCE_THRESHOLD);
-        }
-        response.setLowConfidence(lowConfidence);
+        // Low confidence checking removed - Gemini doesn't provide confidence scores
+        response.setLowConfidence(false);
 
         return response;
     }

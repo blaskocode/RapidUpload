@@ -5,15 +5,18 @@ import os
 from datetime import datetime
 from decimal import Decimal
 
-# Initialize clients (OpenAI is lazy-loaded to allow report_handler to work without API key)
+# Initialize clients (lazy-loaded to allow handlers to work without all API keys)
 s3_client = boto3.client('s3')
 dynamodb = boto3.resource('dynamodb')
 _openai_client = None
+_gemini_client = None
 
 # Configuration
 ANALYSIS_TABLE = os.environ.get('ANALYSIS_TABLE', 'Analysis')
 MIN_CONFIDENCE = float(os.environ.get('MIN_CONFIDENCE', '60.0'))
 OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4o')
+AI_PROVIDER = os.environ.get('AI_PROVIDER', 'gemini')
+GEMINI_MODEL = 'gemini-2.5-flash'
 
 
 def get_openai_client():
@@ -23,6 +26,16 @@ def get_openai_client():
         from openai import OpenAI
         _openai_client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
     return _openai_client
+
+
+def get_gemini_client():
+    """Lazy-load Gemini client to avoid errors when GEMINI_API_KEY is not set."""
+    global _gemini_client
+    if _gemini_client is None:
+        from google import genai
+        _gemini_client = genai.Client(api_key=os.environ.get('GEMINI_API_KEY'))
+    return _gemini_client
+
 
 def handler(event, context):
     """
@@ -68,17 +81,23 @@ def handler(event, context):
         elif s3_key.lower().endswith('.webp'):
             media_type = "image/webp"
 
-        # Call OpenAI GPT-4o Vision for both detection and analysis
-        print("Calling OpenAI GPT-4o Vision")
-        analysis_result = analyze_with_openai(image_bytes, media_type)
+        # Call AI provider for detection and analysis
+        if AI_PROVIDER == 'openai':
+            print("Calling OpenAI GPT-4o Vision")
+            analysis_result = analyze_with_openai(image_bytes, media_type)
+        else:
+            print("Calling Google Gemini 2.5 Flash")
+            analysis_result = analyze_with_gemini(image_bytes, media_type)
 
         # Parse the response and extract detections
         detections = analysis_result.get('detections', [])
         gpt_analysis = json.dumps(analysis_result.get('analysis', {}))
 
-        # Convert confidence values to Decimal for DynamoDB
+        # Convert values to Decimal for DynamoDB
         for detection in detections:
-            detection['confidence'] = Decimal(str(detection.get('confidence', 0)))
+            # Confidence is optional (Gemini doesn't provide it)
+            if detection.get('confidence') is not None:
+                detection['confidence'] = Decimal(str(detection.get('confidence', 0)))
             if detection.get('boundingBox'):
                 bbox = detection['boundingBox']
                 detection['boundingBox'] = {
@@ -218,6 +237,120 @@ Respond ONLY with valid JSON in this exact format:
         raise ValueError("OpenAI returned empty response - image may not be processable")
 
     return json.loads(response_text)
+
+
+def analyze_with_gemini(image_bytes, media_type):
+    """
+    Call Google Gemini 2.5 Flash for object detection with bounding boxes and damage assessment.
+    Returns structured data with detections and analysis.
+    """
+    from google.genai import types
+    from PIL import Image
+    import io
+
+    # Load image to get dimensions for coordinate conversion
+    image = Image.open(io.BytesIO(image_bytes))
+    img_width, img_height = image.size
+
+    prompt = """Analyze this roof/construction image for damage and materials.
+
+TASK 1 - OBJECT DETECTION WITH BOUNDING BOXES:
+Detect all visible items and provide bounding boxes. For each detection include:
+- box_2d: Bounding box as [ymin, xmin, ymax, xmax] normalized to 0-1000
+- label: What you see (e.g., "Hail damage", "Missing shingles", "Shingle bundle", "Plywood sheet")
+- category: One of "damage", "material", or "other"
+- count: For materials, how many of this item are visible (default 1)
+
+TASK 2 - DAMAGE ASSESSMENT:
+Evaluate any roof damage visible:
+- severity: "none", "minor", "moderate", or "severe"
+- damageTypes: Array of damage types found (e.g., ["hail", "wind", "missing_shingles"])
+- description: Brief description of damage observed
+
+TASK 3 - MATERIAL INVENTORY:
+Count visible construction materials:
+- Focus on shingle bundles, plywood sheets, and other roofing materials
+- Provide count and any brand/type visible
+
+Respond with valid JSON in this exact format:
+{
+    "detections": [
+        {
+            "box_2d": [100, 200, 400, 600],
+            "label": "Shingle bundle",
+            "category": "material",
+            "count": 5
+        },
+        {
+            "box_2d": [300, 100, 500, 300],
+            "label": "Hail damage",
+            "category": "damage"
+        }
+    ],
+    "analysis": {
+        "damageAssessment": {
+            "severity": "moderate",
+            "description": "Multiple hail impact marks visible on shingles",
+            "damageTypes": ["hail"]
+        },
+        "materials": {
+            "detected": ["Shingle bundles", "Plywood sheets"],
+            "description": "5 GAF Timberline shingle bundles visible"
+        },
+        "materialInventory": {
+            "items": [{"type": "shingles", "count": 5, "notes": "GAF Timberline bundles"}],
+            "totalCount": 5
+        },
+        "overallConfidence": "high",
+        "recommendations": "Professional inspection recommended"
+    }
+}"""
+
+    # Configure for JSON response
+    config = types.GenerateContentConfig(
+        response_mime_type="application/json"
+    )
+
+    # Call Gemini API
+    response = get_gemini_client().models.generate_content(
+        model=GEMINI_MODEL,
+        contents=[image, prompt],
+        config=config
+    )
+
+    response_text = response.text
+
+    if response_text is None:
+        raise ValueError("Gemini returned empty response - image may not be processable")
+
+    result = json.loads(response_text)
+
+    # Convert Gemini bounding box format to our format
+    # Gemini: [y_min, x_min, y_max, x_max] normalized to 0-1000
+    # Ours: {left, top, width, height} normalized to 0-1
+    converted_detections = []
+    for detection in result.get('detections', []):
+        box = detection.get('box_2d', [])
+        if len(box) == 4:
+            y_min, x_min, y_max, x_max = box
+            converted_detection = {
+                'label': detection.get('label', 'Unknown'),
+                'category': detection.get('category', 'other'),
+                'boundingBox': {
+                    'left': x_min / 1000,
+                    'top': y_min / 1000,
+                    'width': (x_max - x_min) / 1000,
+                    'height': (y_max - y_min) / 1000
+                }
+            }
+            if detection.get('count'):
+                converted_detection['count'] = detection['count']
+            converted_detections.append(converted_detection)
+
+    return {
+        'detections': converted_detections,
+        'analysis': result.get('analysis', {})
+    }
 
 
 def update_analysis_results(table, analysis_id, detections, gpt_analysis):

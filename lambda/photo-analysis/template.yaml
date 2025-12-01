@@ -14,11 +14,23 @@ Parameters:
     Default: 60
   OpenAIApiKey:
     Type: String
-    Description: OpenAI API Key (store in AWS Secrets Manager for production)
+    Description: OpenAI API Key (fallback provider)
     NoEcho: true
+    Default: ''
   OpenAIModel:
     Type: String
     Default: gpt-4o
+  GeminiApiKey:
+    Type: String
+    Description: Google Gemini API Key (primary provider)
+    NoEcho: true
+  AIProvider:
+    Type: String
+    Default: gemini
+    AllowedValues:
+      - gemini
+      - openai
+    Description: Which AI provider to use for analysis
 
 Resources:
   PhotoAnalysisFunction:
@@ -35,6 +47,8 @@ Resources:
           MIN_CONFIDENCE: !Ref MinConfidence
           OPENAI_API_KEY: !Ref OpenAIApiKey
           OPENAI_MODEL: !Ref OpenAIModel
+          GEMINI_API_KEY: !Ref GeminiApiKey
+          AI_PROVIDER: !Ref AIProvider
           PHOTOS_TABLE: Photos
           PHOTOS_BUCKET: !Ref PhotosBucketName
       Policies:
