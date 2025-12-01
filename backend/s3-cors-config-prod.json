@@ -4,8 +4,9 @@
       "AllowedHeaders": ["*"],
       "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
       "AllowedOrigins": [
-        "https://rapidupload.vercel.app",
-        "https://rapidupload-demo.vercel.app",
+        "http://localhost:3000",
+        "https://frontend-nd2qk5nlv-blasko24-6900s-projects.vercel.app",
+        "https://frontend-blasko24-6900s-projects.vercel.app",
         "https://*.vercel.app"
       ],
       "ExposeHeaders": ["ETag", "x-amz-meta-custom-header"],
