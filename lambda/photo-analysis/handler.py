@@ -106,6 +106,9 @@ def handler(event, context):
                     'width': Decimal(str(bbox.get('width', 0))),
                     'height': Decimal(str(bbox.get('height', 0)))
                 }
+            # Convert volume estimate to Decimal for DynamoDB (loose materials)
+            if detection.get('volumeEstimate') is not None:
+                detection['volumeEstimate'] = Decimal(str(detection['volumeEstimate']))
 
         # Update DynamoDB with results
         update_analysis_results(table, analysis_id, detections, gpt_analysis)
@@ -257,8 +260,10 @@ def analyze_with_gemini(image_bytes, media_type):
 TASK 1 - OBJECT DETECTION WITH BOUNDING BOXES:
 Detect all visible items and provide bounding boxes. For each detection include:
 - box_2d: Bounding box as [ymin, xmin, ymax, xmax] normalized to 0-1000
-- label: What you see (e.g., "Hail damage", "Missing shingles", "Shingle bundle", "Plywood sheet", "Gravel pile", "Mulch pile")
+- label: What you see (e.g., "Hail damage", "Missing shingles", "Shingle bundle", "Plywood sheet", "Gravel pile", "Mulch pile", "Sand pile", "Dirt pile", "Topsoil pile", "Stone pile")
 - category: One of "damage", "material", "loose_material", or "other"
+  - Use "loose_material" for ANY bulk/loose materials like: mulch, gravel, sand, dirt, topsoil, stone, rocks, woodchips, compost, fill dirt, crusite, etc.
+  - Use "material" for discrete/packaged items like: shingle bundles, plywood sheets, lumber, rolls, boxes, pallets of materials
 - count: For discrete materials, how many of this item are visible (default 1)
 
 TASK 2 - DAMAGE ASSESSMENT:
@@ -272,18 +277,18 @@ Count visible construction materials:
 - Focus on shingle bundles, plywood sheets, and other roofing materials
 - Provide count and any brand/type visible
 
-TASK 4 - LOOSE MATERIAL VOLUME ESTIMATION:
-For loose materials like gravel, mulch, sand, dirt, or stone piles:
-- Identify any reference objects in the image that can help estimate scale (vehicles, pallets, wheelbarrows, buckets, people, standard building materials)
-- Estimate the approximate volume in cubic yards
-- If no reliable reference is available, explain that volume cannot be estimated accurately
+TASK 4 - LOOSE MATERIAL VOLUME ESTIMATION (REQUIRED for all loose_material detections):
+For EVERY detection with category "loose_material", you MUST include volume estimation fields:
+- Identify any reference objects in the image that can help estimate scale (vehicles, pallets, wheelbarrows, buckets, people, standard building materials, dump trucks, trailers)
+- Estimate the approximate volume in cubic yards based on visible dimensions
+- Even if confidence is low, provide your best estimate
 
-For each loose material detection, include:
-- volumeEstimate: Estimated volume as a number (in cubic yards), or null if cannot estimate
+For each loose_material detection, ALWAYS include these fields:
+- volumeEstimate: Estimated volume as a number (in cubic yards) - make your best estimate even with uncertainty
 - volumeUnit: "cubic_yards"
-- volumeConfidence: "high", "medium", "low", or "none"
-- volumeReference: What reference object was used for scale (e.g., "pickup truck bed", "standard pallet", "5-gallon bucket") or "no_reference" if none available
-- volumeNotes: Explanation of estimate or why it couldn't be calculated
+- volumeConfidence: "high", "medium", "low", or "none" based on reference availability
+- volumeReference: What reference object was used for scale (e.g., "pickup truck bed", "standard pallet", "5-gallon bucket", "dump truck", "estimated pile dimensions") or "no_reference" if none available
+- volumeNotes: Explanation of estimate methodology or uncertainties
 
 Respond with valid JSON in this exact format:
 {
@@ -296,13 +301,23 @@ Respond with valid JSON in this exact format:
         },
         {
             "box_2d": [50, 300, 500, 800],
+            "label": "Mulch pile",
+            "category": "loose_material",
+            "volumeEstimate": 8.0,
+            "volumeUnit": "cubic_yards",
+            "volumeConfidence": "medium",
+            "volumeReference": "dump truck visible for scale",
+            "volumeNotes": "Estimated 8 cubic yards based on typical dump truck delivery size"
+        },
+        {
+            "box_2d": [200, 100, 450, 350],
             "label": "Gravel pile",
             "category": "loose_material",
             "volumeEstimate": 3.5,
             "volumeUnit": "cubic_yards",
-            "volumeConfidence": "medium",
-            "volumeReference": "pickup truck bed visible for scale",
-            "volumeNotes": "Estimated based on comparison to standard 6-foot truck bed"
+            "volumeConfidence": "low",
+            "volumeReference": "estimated pile dimensions",
+            "volumeNotes": "Rough estimate based on visible pile size, no clear reference object"
         }
     ],
     "analysis": {

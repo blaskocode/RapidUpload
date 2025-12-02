@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { AnalysisResult, Detection } from '@/types/api';
 import Card from '@/components/ui/Card';
+import { useDetectionSettingsStore, isDetectionVisible } from '@/stores/detectionSettingsStore';
 
 interface AnalysisResultsPanelProps {
   analysis: AnalysisResult;
@@ -159,9 +160,17 @@ function LooseMaterialsSection({
 }
 
 export default function AnalysisResultsPanel({ analysis, onVolumeUpdate, isUpdatingVolume }: AnalysisResultsPanelProps) {
-  const damageDetections = analysis.detections?.filter(d => d.category === 'damage') || [];
-  const materialDetections = analysis.detections?.filter(d => d.category === 'material') || [];
-  const looseDetections = analysis.detections?.filter(d => d.category === 'loose_material') || [];
+  const visibility = useDetectionSettingsStore((state) => state.visibility);
+
+  // Filter detections based on visibility settings
+  const allDetections = analysis.detections || [];
+  const visibleDetections = allDetections.filter((d) =>
+    isDetectionVisible(d.label, d.category, visibility)
+  );
+
+  const damageDetections = visibleDetections.filter(d => d.category === 'damage');
+  const materialDetections = visibleDetections.filter(d => d.category === 'material');
+  const looseDetections = visibleDetections.filter(d => d.category === 'loose_material');
 
   // Parse Claude analysis
   interface ClaudeAnalysis {

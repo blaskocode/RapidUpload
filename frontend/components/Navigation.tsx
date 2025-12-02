@@ -23,6 +23,10 @@ export default function Navigation() {
       href: '/upload',
       label: 'Upload',
     },
+    {
+      href: '/settings',
+      label: 'Settings',
+    },
   ];
 
   return (

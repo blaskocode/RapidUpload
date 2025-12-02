@@ -1,6 +1,7 @@
 'use client';
 
 import { Detection } from '@/types/api';
+import { useDetectionSettingsStore, isDetectionVisible } from '@/stores/detectionSettingsStore';
 
 interface BoundingBoxOverlayProps {
   detections: Detection[];
@@ -34,11 +35,18 @@ const CATEGORY_COLORS = {
 export default function BoundingBoxOverlay({
   detections,
 }: BoundingBoxOverlayProps) {
+  const visibility = useDetectionSettingsStore((state) => state.visibility);
+
+  // Filter detections based on visibility settings
+  const visibleDetections = detections.filter((detection) =>
+    isDetectionVisible(detection.label, detection.category, visibility)
+  );
+
   return (
     <div
       className="pointer-events-none w-full h-full relative"
     >
-      {detections.map((detection, index) => {
+      {visibleDetections.map((detection, index) => {
         if (!detection.boundingBox) return null;
 
         const { left, top, width, height } = detection.boundingBox;

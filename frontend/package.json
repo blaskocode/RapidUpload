@@ -24,6 +24,7 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-hot-toast": "^2.6.0",
+    "react-webcam": "^7.2.0",
     "react-window": "^2.2.3",
     "zustand": "^5.0.8"
   },
@@ -35,6 +36,7 @@
     "@types/node": "^20.19.25",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/react-webcam": "^1.1.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
     "sharp": "^0.34.5",
