@@ -73,4 +73,32 @@ public class AnalysisController {
         }
         return ResponseEntity.ok(response);
     }
+
+    @PutMapping("/{analysisId}/detection/{detectionIndex}/volume")
+    public ResponseEntity<?> updateDetectionVolume(
+            @PathVariable String analysisId,
+            @PathVariable int detectionIndex,
+            @RequestBody Map<String, Double> body
+    ) {
+        logger.info("Updating volume for analysis {} detection {}", analysisId, detectionIndex);
+
+        Double userVolume = body.get("userVolumeOverride");
+        if (userVolume == null || userVolume < 0) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid volume value"));
+        }
+
+        try {
+            analysisService.updateDetectionVolume(analysisId, detectionIndex, userVolume);
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "detectionIndex", detectionIndex,
+                "userVolumeOverride", userVolume
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Failed to update volume: {}", e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to update volume"));
+        }
+    }
 }

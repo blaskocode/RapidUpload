@@ -252,14 +252,14 @@ def analyze_with_gemini(image_bytes, media_type):
     image = Image.open(io.BytesIO(image_bytes))
     img_width, img_height = image.size
 
-    prompt = """Analyze this roof/construction image for damage and materials.
+    prompt = """Analyze this roof/construction image for damage, materials, and loose material volumes.
 
 TASK 1 - OBJECT DETECTION WITH BOUNDING BOXES:
 Detect all visible items and provide bounding boxes. For each detection include:
 - box_2d: Bounding box as [ymin, xmin, ymax, xmax] normalized to 0-1000
-- label: What you see (e.g., "Hail damage", "Missing shingles", "Shingle bundle", "Plywood sheet")
-- category: One of "damage", "material", or "other"
-- count: For materials, how many of this item are visible (default 1)
+- label: What you see (e.g., "Hail damage", "Missing shingles", "Shingle bundle", "Plywood sheet", "Gravel pile", "Mulch pile")
+- category: One of "damage", "material", "loose_material", or "other"
+- count: For discrete materials, how many of this item are visible (default 1)
 
 TASK 2 - DAMAGE ASSESSMENT:
 Evaluate any roof damage visible:
@@ -272,6 +272,19 @@ Count visible construction materials:
 - Focus on shingle bundles, plywood sheets, and other roofing materials
 - Provide count and any brand/type visible
 
+TASK 4 - LOOSE MATERIAL VOLUME ESTIMATION:
+For loose materials like gravel, mulch, sand, dirt, or stone piles:
+- Identify any reference objects in the image that can help estimate scale (vehicles, pallets, wheelbarrows, buckets, people, standard building materials)
+- Estimate the approximate volume in cubic yards
+- If no reliable reference is available, explain that volume cannot be estimated accurately
+
+For each loose material detection, include:
+- volumeEstimate: Estimated volume as a number (in cubic yards), or null if cannot estimate
+- volumeUnit: "cubic_yards"
+- volumeConfidence: "high", "medium", "low", or "none"
+- volumeReference: What reference object was used for scale (e.g., "pickup truck bed", "standard pallet", "5-gallon bucket") or "no_reference" if none available
+- volumeNotes: Explanation of estimate or why it couldn't be calculated
+
 Respond with valid JSON in this exact format:
 {
     "detections": [
@@ -282,9 +295,14 @@ Respond with valid JSON in this exact format:
             "count": 5
         },
         {
-            "box_2d": [300, 100, 500, 300],
-            "label": "Hail damage",
-            "category": "damage"
+            "box_2d": [50, 300, 500, 800],
+            "label": "Gravel pile",
+            "category": "loose_material",
+            "volumeEstimate": 3.5,
+            "volumeUnit": "cubic_yards",
+            "volumeConfidence": "medium",
+            "volumeReference": "pickup truck bed visible for scale",
+            "volumeNotes": "Estimated based on comparison to standard 6-foot truck bed"
         }
     ],
     "analysis": {
@@ -300,6 +318,18 @@ Respond with valid JSON in this exact format:
         "materialInventory": {
             "items": [{"type": "shingles", "count": 5, "notes": "GAF Timberline bundles"}],
             "totalCount": 5
+        },
+        "looseVolumes": {
+            "totalCubicYards": 3.5,
+            "items": [
+                {
+                    "material": "gravel",
+                    "estimatedVolume": 3.5,
+                    "confidence": "medium",
+                    "reference": "pickup truck bed"
+                }
+            ],
+            "notes": "Volume estimates based on visible reference objects"
         },
         "overallConfidence": "high",
         "recommendations": "Professional inspection recommended"
@@ -345,6 +375,15 @@ Respond with valid JSON in this exact format:
             }
             if detection.get('count'):
                 converted_detection['count'] = detection['count']
+
+            # Add volume fields for loose materials
+            if detection.get('volumeEstimate') is not None:
+                converted_detection['volumeEstimate'] = detection['volumeEstimate']
+                converted_detection['volumeUnit'] = detection.get('volumeUnit', 'cubic_yards')
+                converted_detection['volumeConfidence'] = detection.get('volumeConfidence', 'low')
+                converted_detection['volumeReference'] = detection.get('volumeReference', '')
+                converted_detection['volumeNotes'] = detection.get('volumeNotes', '')
+
             converted_detections.append(converted_detection)
 
     return {

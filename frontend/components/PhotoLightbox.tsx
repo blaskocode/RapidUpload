@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
 import type { Photo } from '@/types/api';
-import { useAnalysisByPhoto, useTriggerAnalysis } from '@/lib/hooks/useAnalysis';
+import { useAnalysisByPhoto, useTriggerAnalysis, useUpdateDetectionVolume } from '@/lib/hooks/useAnalysis';
 import BoundingBoxOverlay from './BoundingBoxOverlay';
 import AnalysisResultsPanel from './AnalysisResultsPanel';
 import AnalysisStatusBadge from './AnalysisStatusBadge';
@@ -31,6 +31,7 @@ export default function PhotoLightbox({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const triggerAnalysis = useTriggerAnalysis();
+  const updateVolume = useUpdateDetectionVolume();
 
   // Update current index when initialIndex changes
   useEffect(() => {
@@ -107,6 +108,21 @@ export default function PhotoLightbox({
       console.error('Analysis error:', error);
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const handleVolumeUpdate = async (detectionIndex: number, volume: number) => {
+    if (!analysis?.analysisId) return;
+    try {
+      await updateVolume.mutateAsync({
+        analysisId: analysis.analysisId,
+        detectionIndex,
+        userVolumeOverride: volume,
+      });
+      toast.success('Volume updated');
+    } catch (error) {
+      toast.error('Failed to update volume');
+      console.error('Volume update error:', error);
     }
   };
 
@@ -368,7 +384,11 @@ export default function PhotoLightbox({
           {/* Panel content */}
           {isAnalysisPanelOpen && (
             <div className="max-w-sm max-h-[55vh] overflow-y-auto rounded-[var(--radius-lg)]">
-              <AnalysisResultsPanel analysis={analysis} />
+              <AnalysisResultsPanel
+                analysis={analysis}
+                onVolumeUpdate={handleVolumeUpdate}
+                isUpdatingVolume={updateVolume.isPending}
+              />
             </div>
           )}
         </div>

@@ -533,6 +533,22 @@ export class UploadManager {
           console.error('Failed to recalculate photo count:', error);
           // Don't fail the entire upload if count recalculation fails
         }
+
+        // Auto-analyze if enabled
+        const { autoAnalyze } = useUploadStore.getState();
+        if (autoAnalyze) {
+          try {
+            const photoIds = finalCompleted.map(p => p.photoId);
+            await api.post('/analysis/trigger', {
+              propertyId,
+              photoIds,
+            });
+            console.log(`Auto-triggered analysis for ${photoIds.length} photos`);
+          } catch (error: any) {
+            console.error('Failed to auto-trigger analysis:', error);
+            // Don't fail upload if analysis trigger fails
+          }
+        }
       }
 
       // Show results - ONLY count photos from THIS batch

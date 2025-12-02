@@ -95,3 +95,29 @@ export function useGenerateReport() {
     },
   });
 }
+
+export function useUpdateDetectionVolume() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      analysisId,
+      detectionIndex,
+      userVolumeOverride
+    }: {
+      analysisId: string;
+      detectionIndex: number;
+      userVolumeOverride: number;
+    }) => {
+      const response = await api.put(
+        `/analysis/${analysisId}/detection/${detectionIndex}/volume`,
+        { userVolumeOverride }
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      // Invalidate the analysis queries to refetch
+      queryClient.invalidateQueries({ queryKey: analysisKeys.all });
+    },
+  });
+}

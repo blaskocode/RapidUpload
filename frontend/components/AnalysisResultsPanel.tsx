@@ -1,15 +1,167 @@
 'use client';
 
-import { AnalysisResult } from '@/types/api';
+import { useState } from 'react';
+import { AnalysisResult, Detection } from '@/types/api';
 import Card from '@/components/ui/Card';
 
 interface AnalysisResultsPanelProps {
   analysis: AnalysisResult;
+  onVolumeUpdate?: (detectionIndex: number, volume: number) => void;
+  isUpdatingVolume?: boolean;
 }
 
-export default function AnalysisResultsPanel({ analysis }: AnalysisResultsPanelProps) {
+// Sub-component for editable loose material item
+function LooseMaterialItem({
+  detection,
+  detectionIndex,
+  onVolumeUpdate,
+  isUpdatingVolume,
+}: {
+  detection: Detection;
+  detectionIndex: number;
+  onVolumeUpdate?: (detectionIndex: number, volume: number) => void;
+  isUpdatingVolume?: boolean;
+}) {
+  const displayVolume = detection.userVolumeOverride ?? detection.volumeEstimate;
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(displayVolume?.toFixed(1) || '');
+
+  const handleSave = () => {
+    const value = parseFloat(editValue);
+    if (!isNaN(value) && value >= 0 && onVolumeUpdate) {
+      onVolumeUpdate(detectionIndex, value);
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditValue(displayVolume?.toFixed(1) || '');
+    setIsEditing(false);
+  };
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-[var(--color-text-primary)] font-medium">{detection.label}</span>
+        {displayVolume != null ? (
+          <div className="flex items-center gap-2">
+            {isEditing ? (
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  className="w-20 px-2 py-1 text-sm border rounded"
+                  autoFocus
+                />
+                <button
+                  onClick={handleSave}
+                  disabled={isUpdatingVolume}
+                  className="px-2 py-1 text-xs bg-amber-500 text-white rounded hover:bg-amber-600 disabled:opacity-50"
+                >
+                  {isUpdatingVolume ? '...' : 'Save'}
+                </button>
+                <button
+                  onClick={handleCancel}
+                  className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <>
+                <span className="text-amber-700 font-semibold">
+                  ~{displayVolume.toFixed(1)} {detection.volumeUnit || 'cubic yards'}
+                </span>
+                {detection.userVolumeOverride != null && (
+                  <span className="text-xs text-amber-600">(confirmed)</span>
+                )}
+                {onVolumeUpdate && (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="text-xs text-amber-600 hover:text-amber-800 underline"
+                  >
+                    Edit
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        ) : (
+          <span className="text-orange-600 text-xs">Unable to estimate</span>
+        )}
+      </div>
+      {detection.volumeConfidence && detection.volumeConfidence !== 'none' && (
+        <div className="flex items-center gap-2 text-xs text-amber-600">
+          <span className={`px-1.5 py-0.5 rounded ${
+            detection.volumeConfidence === 'high' ? 'bg-green-100 text-green-700' :
+            detection.volumeConfidence === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+            'bg-orange-100 text-orange-700'
+          }`}>
+            {detection.volumeConfidence} confidence
+          </span>
+          {detection.volumeReference && detection.volumeReference !== 'no_reference' && (
+            <span>via {detection.volumeReference}</span>
+          )}
+        </div>
+      )}
+      {detection.volumeNotes && (
+        <p className="text-xs text-[var(--color-text-secondary)] italic">
+          {detection.volumeNotes}
+        </p>
+      )}
+      {detection.volumeEstimate == null && (
+        <p className="text-xs text-orange-600">
+          Volume could not be estimated - no reference objects visible
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Sub-component for the loose materials section
+function LooseMaterialsSection({
+  analysis,
+  looseDetections,
+  onVolumeUpdate,
+  isUpdatingVolume,
+}: {
+  analysis: AnalysisResult;
+  looseDetections: Detection[];
+  onVolumeUpdate?: (detectionIndex: number, volume: number) => void;
+  isUpdatingVolume?: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <div className="w-2 h-2 rounded-full bg-amber-500" />
+        <h4 className="text-sm font-medium text-amber-600">Loose Materials</h4>
+      </div>
+      <div className="bg-amber-50 rounded-[var(--radius-md)] p-3 space-y-3">
+        {looseDetections.map((d, i) => {
+          // Find the actual index in the full detections array
+          const detectionIndex = analysis.detections?.findIndex(det => det === d) ?? i;
+          return (
+            <LooseMaterialItem
+              key={i}
+              detection={d}
+              detectionIndex={detectionIndex}
+              onVolumeUpdate={onVolumeUpdate}
+              isUpdatingVolume={isUpdatingVolume}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export default function AnalysisResultsPanel({ analysis, onVolumeUpdate, isUpdatingVolume }: AnalysisResultsPanelProps) {
   const damageDetections = analysis.detections?.filter(d => d.category === 'damage') || [];
   const materialDetections = analysis.detections?.filter(d => d.category === 'material') || [];
+  const looseDetections = analysis.detections?.filter(d => d.category === 'loose_material') || [];
 
   // Parse Claude analysis
   interface ClaudeAnalysis {
@@ -105,6 +257,16 @@ export default function AnalysisResultsPanel({ analysis }: AnalysisResultsPanelP
         </div>
       )}
 
+      {/* Loose Materials / Volume Section */}
+      {looseDetections.length > 0 && (
+        <LooseMaterialsSection
+          analysis={analysis}
+          looseDetections={looseDetections}
+          onVolumeUpdate={onVolumeUpdate}
+          isUpdatingVolume={isUpdatingVolume}
+        />
+      )}
+
       {/* AI Assessment */}
       {claudeData.damageAssessment && (
         <div className="space-y-2">
@@ -159,6 +321,7 @@ export default function AnalysisResultsPanel({ analysis }: AnalysisResultsPanelP
       {/* No detections */}
       {damageDetections.length === 0 &&
        materialDetections.length === 0 &&
+       looseDetections.length === 0 &&
        !claudeData.materials?.detected?.length &&
        !claudeData.materials?.description &&
        !claudeData.damageAssessment &&

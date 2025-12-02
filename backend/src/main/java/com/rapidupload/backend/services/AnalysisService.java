@@ -128,6 +128,24 @@ public class AnalysisService {
         );
     }
 
+    public void updateDetectionVolume(String analysisId, int detectionIndex, Double userVolumeOverride) {
+        AnalysisResult analysis = analysisRepository.getAnalysis(analysisId);
+        if (analysis == null) {
+            throw new IllegalArgumentException("Analysis not found: " + analysisId);
+        }
+
+        var detections = analysis.getDetections();
+        if (detections == null || detectionIndex < 0 || detectionIndex >= detections.size()) {
+            throw new IllegalArgumentException("Invalid detection index: " + detectionIndex);
+        }
+
+        var detection = detections.get(detectionIndex);
+        detection.setUserVolumeOverride(userVolumeOverride);
+
+        analysisRepository.updateAnalysis(analysis);
+        logger.info("Updated volume for analysis {} detection {} to {}", analysisId, detectionIndex, userVolumeOverride);
+    }
+
     private AnalysisResponse toAnalysisResponse(AnalysisResult result) {
         AnalysisResponse response = new AnalysisResponse();
         response.setAnalysisId(result.getAnalysisId());

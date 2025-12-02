@@ -7,6 +7,7 @@ interface UploadStore {
   selectedPropertyId: string | null;
   uploadStatus: Record<string, UploadStatusInfo>;
   isUploading: boolean;
+  autoAnalyze: boolean;
 
   // Actions
   addPhotosToQueue: (files: File[], propertyId: string) => void;
@@ -19,6 +20,7 @@ interface UploadStore {
   removeFromQueue: (photoId: string) => void;
   setSelectedPropertyId: (propertyId: string | null) => void;
   setIsUploading: (isUploading: boolean) => void;
+  setAutoAnalyze: (value: boolean) => void;
 }
 
 // Helper to filter out old completed uploads (older than 24 hours)
@@ -55,6 +57,7 @@ export const useUploadStore = create<UploadStore>()(
       selectedPropertyId: null,
       uploadStatus: {},
       isUploading: false,
+      autoAnalyze: true, // Default to enabled
 
       addPhotosToQueue: (files: File[], propertyId: string) => {
         const newPhotos: QueuedPhoto[] = files.map((file) => ({
@@ -178,6 +181,10 @@ export const useUploadStore = create<UploadStore>()(
       setIsUploading: (isUploading: boolean) => {
         set({ isUploading });
       },
+
+      setAutoAnalyze: (value: boolean) => {
+        set({ autoAnalyze: value });
+      },
     }),
     {
       name: 'upload-queue-storage',
@@ -200,6 +207,7 @@ export const useUploadStore = create<UploadStore>()(
           })),
         uploadStatus: filterOldCompleted(state.uploadStatus),
         selectedPropertyId: state.selectedPropertyId,
+        autoAnalyze: state.autoAnalyze,
       }),
       onRehydrateStorage: () => (state) => {
         // On restore, mark any uploading items as failed (File objects are lost)

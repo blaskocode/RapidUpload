@@ -19,6 +19,11 @@ const CATEGORY_COLORS = {
     bg: 'bg-[var(--color-success)]',
     text: 'text-[var(--color-success)]'
   },
+  loose_material: {
+    border: 'border-amber-500',
+    bg: 'bg-amber-500',
+    text: 'text-amber-500'
+  },
   other: {
     border: 'border-[var(--color-accent)]',
     bg: 'bg-[var(--color-accent)]',

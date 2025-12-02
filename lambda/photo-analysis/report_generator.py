@@ -11,9 +11,10 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 # Category colors for bounding boxes
 CATEGORY_COLORS = {
-    'damage': (255, 0, 0, 128),      # Red with transparency
-    'material': (0, 255, 0, 128),    # Green with transparency
-    'other': (255, 165, 0, 128)      # Orange with transparency
+    'damage': (255, 0, 0, 128),           # Red with transparency
+    'material': (0, 255, 0, 128),         # Green with transparency
+    'loose_material': (255, 191, 0, 128), # Amber with transparency
+    'other': (255, 165, 0, 128)           # Orange with transparency
 }
 
 def create_annotated_image(image_bytes, detections):
@@ -139,12 +140,23 @@ def generate_pdf_report(property_name, photos_data, output_path=None):
     # Summary section
     total_damage = 0
     total_materials = 0
+    total_loose_materials = 0
+    total_volume = 0.0
     severity_counts = {'none': 0, 'minor': 0, 'moderate': 0, 'severe': 0}
 
     for photo_data in photos_data:
         detections = photo_data.get('detections', [])
         total_damage += len([d for d in detections if d.get('category') == 'damage'])
         total_materials += len([d for d in detections if d.get('category') == 'material'])
+
+        # Count loose materials and sum volumes
+        loose = [d for d in detections if d.get('category') == 'loose_material']
+        total_loose_materials += len(loose)
+        for d in loose:
+            # Use user override if available, otherwise AI estimate
+            volume = d.get('userVolumeOverride') or d.get('volumeEstimate')
+            if volume:
+                total_volume += float(volume)
 
         # Parse Claude analysis for severity
         try:
@@ -161,6 +173,8 @@ def generate_pdf_report(property_name, photos_data, output_path=None):
         ['Total Photos Analyzed', str(len(photos_data))],
         ['Damage Detections', str(total_damage)],
         ['Material Detections', str(total_materials)],
+        ['Loose Material Detections', str(total_loose_materials)],
+        ['Estimated Total Volume', f"{total_volume:.1f} cubic yards" if total_volume > 0 else "N/A"],
         ['Severe Damage Photos', str(severity_counts['severe'])],
         ['Moderate Damage Photos', str(severity_counts['moderate'])],
         ['Minor Damage Photos', str(severity_counts['minor'])],
@@ -203,6 +217,7 @@ def generate_pdf_report(property_name, photos_data, output_path=None):
         # Detection details
         damage_detections = [d for d in detections if d.get('category') == 'damage']
         material_detections = [d for d in detections if d.get('category') == 'material']
+        loose_detections = [d for d in detections if d.get('category') == 'loose_material']
 
         if damage_detections:
             story.append(Paragraph("Damage Detected:", normal_style))
@@ -220,6 +235,27 @@ def generate_pdf_report(property_name, photos_data, output_path=None):
                     f"  - {d.get('label')}: {count} unit(s)",
                     normal_style
                 ))
+
+        if loose_detections:
+            story.append(Paragraph("Loose Materials Detected:", normal_style))
+            for d in loose_detections:
+                # Use user override if available, otherwise AI estimate
+                volume = d.get('userVolumeOverride') or d.get('volumeEstimate')
+                is_confirmed = d.get('userVolumeOverride') is not None
+                confidence = d.get('volumeConfidence', '')
+
+                if volume:
+                    confirmed_text = " (confirmed)" if is_confirmed else ""
+                    confidence_text = f" [{confidence} confidence]" if confidence and not is_confirmed else ""
+                    story.append(Paragraph(
+                        f"  - {d.get('label')}: ~{float(volume):.1f} cubic yards{confirmed_text}{confidence_text}",
+                        normal_style
+                    ))
+                else:
+                    story.append(Paragraph(
+                        f"  - {d.get('label')}: Volume could not be estimated",
+                        normal_style
+                    ))
 
         # Claude analysis
         try:
